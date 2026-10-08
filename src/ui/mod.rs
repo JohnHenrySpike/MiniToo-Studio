@@ -106,6 +106,10 @@ pub fn run(core: CoreHandle, opts: &UiOptions) -> UiExit {
     let viewport = egui::ViewportBuilder::default()
         .with_title("MiniToo Studio")
         .with_app_id("minitoo-studio")
+        .with_icon({
+            let img = crate::platform::tray::icon_rgba(crate::color::Color::hex(0xd97757), 64);
+            egui::IconData { width: img.width(), height: img.height(), rgba: img.into_raw() }
+        })
         .with_inner_size(size)
         .with_min_inner_size(min);
     let native = eframe::NativeOptions { viewport, run_and_return: true, centered: true, ..Default::default() };
