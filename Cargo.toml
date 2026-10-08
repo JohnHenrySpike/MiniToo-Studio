@@ -1,0 +1,71 @@
+[package]
+name = "minitoo-studio"
+version = "0.1.0"
+edition = "2024"
+description = "MiniToo Studio: everything on the screen of a Divoom MiniToo speaker"
+authors = ["John Henry Spike <johnhenryspike@gmail.com>"]
+license = "MIT"
+
+[[bin]]
+name = "minitoo-studio"
+path = "src/main.rs"
+
+[lib]
+name = "minitoo"
+path = "src/lib.rs"
+
+[dependencies]
+# UI
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.36"
+rfd = { version = "0.17", default-features = false, features = ["xdg-portal", "pollster"] }
+
+# drawing and media
+tiny-skia = "0.12"
+ab_glyph = "0.2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "ico", "qoi", "tga", "pnm"] }
+resvg = { version = "0.48", default-features = false, features = ["text", "raster-images"] }
+jxl-oxide = "0.12"
+zstd = "0.14"
+rustfft = "6"
+
+# runtime, network, data
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "fs", "process"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "http2"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["clock"] }
+sha1_smol = "1"
+parking_lot = "0.12"
+dirs = "6"
+log = "0.4"
+rand = "0.9"
+futures-util = "0.3"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+ksni = { version = "0.3", default-features = false, features = ["tokio"] }
+ashpd = { version = "0.13", default-features = false, features = ["tokio", "screencast"] }
+pipewire = "0.10"
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+serialport = { version = "4", default-features = false }
+sysinfo = "0.39"
+tray-icon = "0.21"
+cpal = "0.18"
+xcap = "0.9"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Networking_WinSock", "Win32_Devices_Bluetooth", "Win32_Foundation"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
