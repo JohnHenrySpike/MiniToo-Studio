@@ -69,6 +69,21 @@ fn parse_args() -> Result<Args, String> {
     Ok(a)
 }
 
+/// stderr logger for the `log` macros used by the platform modules.
+struct StderrLog;
+
+impl log::Log for StderrLog {
+    fn enabled(&self, m: &log::Metadata) -> bool {
+        m.level() <= log::Level::Info && m.target().starts_with("minitoo")
+    }
+    fn log(&self, r: &log::Record) {
+        if self.enabled(r.metadata()) {
+            eprintln!("[minitoo] {}", r.args());
+        }
+    }
+    fn flush(&self) {}
+}
+
 fn post(port: u16, path: &str, body: &[u8]) -> Option<(u16, Vec<u8>)> {
     minitoo::http::request(port, "POST", path, body, Duration::from_secs(5))
 }
@@ -81,6 +96,8 @@ fn main() {
             std::process::exit(2);
         }
     };
+    static LOGGER: StderrLog = StderrLog;
+    let _ = log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info));
     let settings = Settings::load();
     let port = settings.int_in("claude/port", DEFAULT_PORT as i64, 1024, 65535) as u16;
 

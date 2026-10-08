@@ -1,0 +1,9 @@
+# Build environment: the same distribution as the host, stable Rust via rustup (plus the
+# Windows target for cross type-checking), the development files of PipeWire/D-Bus and clang
+# for bindgen. Nothing is installed on the host.
+FROM cachyos/cachyos:latest
+RUN pacman -Syu --noconfirm --needed base-devel rustup clang pkgconf pipewire libpipewire dbus zstd mingw-w64-gcc \
+ && pacman -Scc --noconfirm
+ENV RUSTUP_HOME=/opt/rustup
+RUN rustup default stable && rustup target add x86_64-pc-windows-gnu && chmod -R a+rX /opt/rustup
+WORKDIR /src

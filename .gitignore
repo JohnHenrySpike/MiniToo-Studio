@@ -1,3 +1,5 @@
 target/
 *.log
 .claude/worktrees/
+build/
+docker/cargo/
