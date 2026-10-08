@@ -19,3 +19,4 @@ pub mod worker;
 pub mod media;
 pub mod gallery;
 pub mod http;
+pub mod rotation;

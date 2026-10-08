@@ -305,15 +305,15 @@ fn read_settings(path: &Path) -> Result<Value, String> {
         Ok(text) if text.trim().is_empty() => Ok(json!({})),
         Ok(text) => match serde_json::from_str::<Value>(&text) {
             Ok(v) if v.is_object() => Ok(v),
-            Ok(_) => Err(format!("{} — не JSON-объект", path.display())),
-            Err(e) => Err(format!("{} — некорректный JSON: {e}", path.display())),
+            _ => Err(format!("{} содержит некорректный JSON — хуки не установлены", path.display())),
         },
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(json!({})),
         Err(e) => Err(format!("{}: {e}", path.display())),
     }
 }
 
-fn backup(path: &Path) -> Result<Option<PathBuf>, String> {
+/// `settings.json.minitoo-backup-yyyyMMdd-HHmmss`
+pub fn backup(path: &Path) -> Result<Option<PathBuf>, String> {
     if !path.exists() {
         return Ok(None);
     }
@@ -322,7 +322,7 @@ fn backup(path: &Path) -> Result<Option<PathBuf>, String> {
         "{}.minitoo-backup-{stamp}",
         path.file_name().map(|s| s.to_string_lossy()).unwrap_or_default()
     ));
-    std::fs::copy(path, &b).map_err(|e| format!("резервная копия: {e}"))?;
+    std::fs::copy(path, &b).map_err(|_| "Не удалось сделать резервную копию".to_string())?;
     Ok(Some(b))
 }
 
@@ -355,24 +355,20 @@ pub fn install_hooks_at(path: &Path, port: u16) -> Result<String, String> {
             .push(json!({ "hooks": [{ "type": "command", "command": hook_command(port) }] }));
     }
     write_settings(path, &root)?;
-    Ok(match b {
-        Some(b) => format!("Хуки установлены. Резервная копия: {}", b.display()),
-        None => "Хуки установлены.".to_string(),
-    })
+    let _ = b;
+    Ok("Хуки установлены. Новые сессии Claude Code начнут присылать статус.".to_string())
 }
 
 pub fn uninstall_hooks_at(path: &Path) -> Result<String, String> {
     if !path.exists() {
-        return Ok("Хуков нет.".to_string());
+        return Err(format!("Файл {} не найден", path.display()));
     }
     let mut root = read_settings(path)?;
     let b = backup(path)?;
     strip_own(&mut root);
     write_settings(path, &root)?;
-    Ok(match b {
-        Some(b) => format!("Хуки удалены. Резервная копия: {}", b.display()),
-        None => "Хуки удалены.".to_string(),
-    })
+    let _ = b;
+    Ok("Хуки удалены.".to_string())
 }
 
 /// «Установлены» = every one of the 7 events has our entry with the current port.
