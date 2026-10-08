@@ -138,7 +138,8 @@ fn text_texture(ctx: &egui::Context, text: &str, st: &PixStyle) -> (TextureId, [
             pixelfont::render(text, Color::WHITE, st.spacing)
         } else {
             let mut cv = Canvas::new(w as u32, h as u32);
-            let f = st.font();
+            let mut f = st.font();
+            f.aa = true;
             if st.spacing == 0 {
                 cv.text_tl(0.0, 0.0, text, f, Color::WHITE);
             } else {
@@ -153,7 +154,8 @@ fn text_texture(ctx: &egui::Context, text: &str, st: &PixStyle) -> (TextureId, [
         };
         let rgba = canvas.to_rgba();
         let (cw, ch) = (canvas.width() as usize, canvas.height() as usize);
-        let tex = mask_texture(ctx, &format!("ptext:{text}"), cw, ch, |x, y| rgba[(y * cw + x) * 4 + 3]);
+        // a slightly high cut-off thins the stems like hinted monochrome text
+        let tex = mask_texture(ctx, &format!("ptext:{text}"), cw, ch, |x, y| if rgba[(y * cw + x) * 4 + 3] >= 158 { 255 } else { 0 });
         let id = tex.id();
         c.texts.insert(key, (tex, [cw, ch]));
         (id, [cw, ch])
