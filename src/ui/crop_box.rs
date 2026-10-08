@@ -59,16 +59,16 @@ pub fn crop_box(ui: &mut Ui, id: Id, img: Rect, crop: NRect) -> Option<CropEvent
     let body = ui.interact(sel, id.with("body"), Sense::click_and_drag());
     let cursor = if body.dragged() { CursorIcon::Grabbing } else { CursorIcon::Grab };
     let body = body.on_hover_cursor(cursor);
-    if body.drag_started() {
-        if let Some(p) = body.interact_pointer_pos() {
-            st.grab = Some(Grab::Move { start: p, rect: sel });
-        }
+    if body.drag_started()
+        && let Some(p) = body.interact_pointer_pos()
+    {
+        st.grab = Some(Grab::Move { start: p, rect: sel });
     }
-    if body.dragged() {
-        if let (Some(Grab::Move { start, rect }), Some(p)) = (st.grab, body.interact_pointer_pos()) {
-            let d = p - start;
-            out = Some(CropEvent::Edited(emit_px(area, rect.left() - img.left() + d.x, rect.top() - img.top() + d.y, rect.width())));
-        }
+    if body.dragged()
+        && let (Some(Grab::Move { start, rect }), Some(p)) = (st.grab, body.interact_pointer_pos())
+    {
+        let d = p - start;
+        out = Some(CropEvent::Edited(emit_px(area, rect.left() - img.left() + d.x, rect.top() - img.top() + d.y, rect.width())));
     }
     if body.double_clicked() {
         out = Some(CropEvent::Reset);
@@ -95,18 +95,18 @@ pub fn crop_box(ui: &mut Ui, id: Id, img: Rect, crop: NRect) -> Option<CropEvent
             let anchor = pos2(if right { sel.left() } else { sel.right() }, if bottom { sel.top() } else { sel.bottom() }) - img.min.to_vec2();
             st.grab = Some(Grab::Corner { anchor, right, bottom });
         }
-        if resp.dragged() {
-            if let (Some(Grab::Corner { anchor, right, bottom }), Some(p)) = (st.grab, resp.interact_pointer_pos()) {
-                let p = p - img.min.to_vec2();
-                let mut w = (p.x - anchor.x).abs().max((p.y - anchor.y).abs() * ASPECT);
-                let max_w = if right { area.x - anchor.x } else { anchor.x };
-                let max_h = if bottom { area.y - anchor.y } else { anchor.y };
-                w = w.min(max_w).min(max_h * ASPECT).max(16.0);
-                let h = w / ASPECT;
-                let x = if right { anchor.x } else { anchor.x - w };
-                let y = if bottom { anchor.y } else { anchor.y - h };
-                out = Some(CropEvent::Edited(emit_px(area, x, y, w)));
-            }
+        if resp.dragged()
+            && let (Some(Grab::Corner { anchor, right, bottom }), Some(p)) = (st.grab, resp.interact_pointer_pos())
+        {
+            let p = p - img.min.to_vec2();
+            let mut w = (p.x - anchor.x).abs().max((p.y - anchor.y).abs() * ASPECT);
+            let max_w = if right { area.x - anchor.x } else { anchor.x };
+            let max_h = if bottom { area.y - anchor.y } else { anchor.y };
+            w = w.min(max_w).min(max_h * ASPECT).max(16.0);
+            let h = w / ASPECT;
+            let x = if right { anchor.x } else { anchor.x - w };
+            let y = if bottom { anchor.y } else { anchor.y - h };
+            out = Some(CropEvent::Edited(emit_px(area, x, y, w)));
         }
     }
     if !ui.input(|i| i.pointer.any_down()) {

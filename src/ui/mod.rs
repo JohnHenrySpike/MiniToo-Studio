@@ -6,6 +6,7 @@ mod device_panel;
 mod nav;
 mod pages;
 pub mod pixel;
+mod script;
 pub mod textures;
 pub mod theme;
 pub mod widgets;
@@ -152,6 +153,7 @@ struct StudioApp {
     pages: pages::Pages,
     panel: device_panel::State,
     shot: Option<Shot>,
+    script: Option<script::Script>,
     exit: Arc<Mutex<UiExit>>,
     closing: bool,
 }
@@ -172,6 +174,7 @@ impl StudioApp {
             preview_claude: false,
             pages: pages::Pages::default(),
             panel: device_panel::State::default(),
+            script: shot.as_ref().and_then(|_| std::env::var("MINITOO_UI_SCRIPT").ok()).map(|s| script::Script::parse(&s)),
             shot: shot.map(|dir| Shot { dir, step: 0, frames: 0, since: Instant::now(), requested: false }),
             exit,
             closing: false,
@@ -225,38 +228,60 @@ impl StudioApp {
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
 
-    fn screenshot_step(&mut self, ctx: &egui::Context) {
+    /// Saves finished captures: page cycle steps (`usize`) and script shots (`String`).
+    fn save_screenshots(&mut self, ctx: &egui::Context) {
         let Some(shot) = self.shot.as_mut() else { return };
-        let total = PAGE_COUNT * 2;
-        // a finished capture arrives as an event
-        let images: Vec<(usize, Arc<egui::ColorImage>)> = ctx.input(|i| {
+        let images: Vec<(String, Option<usize>, Arc<egui::ColorImage>)> = ctx.input(|i| {
             i.raw
                 .events
                 .iter()
                 .filter_map(|e| match e {
                     egui::Event::Screenshot { user_data, image, .. } => {
-                        user_data.data.as_ref().and_then(|d| d.downcast_ref::<usize>()).map(|s| (*s, image.clone()))
+                        let d = user_data.data.as_ref()?;
+                        if let Some(step) = d.downcast_ref::<usize>() {
+                            let name = if *step < PAGE_COUNT { format!("page{step}") } else { format!("dark{}", step - PAGE_COUNT) };
+                            Some((name, Some(*step), image.clone()))
+                        } else {
+                            d.downcast_ref::<String>().map(|n| (n.clone(), None, image.clone()))
+                        }
                     }
                     _ => None,
                 })
                 .collect()
         });
-        for (step, image) in images {
-            let name = if step < PAGE_COUNT { format!("page{step}.png") } else { format!("dark{}.png", step - PAGE_COUNT) };
+        for (name, step, image) in images {
             let [w, h] = image.size;
             let bytes: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_srgba_unmultiplied()).collect();
-            if let Some(img) = image::RgbaImage::from_raw(w as u32, h as u32, bytes) {
-                if let Err(e) = img.save(shot.dir.join(&name)) {
-                    log::error!("screenshot {name}: {e}");
-                }
+            if let Some(img) = image::RgbaImage::from_raw(w as u32, h as u32, bytes)
+                && let Err(e) = img.save(shot.dir.join(format!("{name}.png")))
+            {
+                log::error!("screenshot {name}: {e}");
             }
-            if step == shot.step {
+            if step == Some(shot.step) {
                 shot.step += 1;
                 shot.frames = 0;
                 shot.requested = false;
                 shot.since = Instant::now();
             }
+            if let Some(sc) = self.script.as_mut()
+                && sc.shooting.as_deref() == Some(name.as_str())
+            {
+                sc.shooting = None;
+            }
         }
+    }
+
+    fn screenshot_step(&mut self, ctx: &egui::Context) {
+        self.save_screenshots(ctx);
+        if self.script.is_some() {
+            if self.script.as_ref().is_some_and(|s| s.done()) {
+                self.finish(ctx, UiExit::Quit);
+            }
+            ctx.request_repaint_after(Duration::from_millis(30));
+            return;
+        }
+        let Some(shot) = self.shot.as_mut() else { return };
+        let total = PAGE_COUNT * 2;
         if shot.step >= total {
             self.finish(ctx, UiExit::Quit);
             return;
@@ -265,17 +290,13 @@ impl StudioApp {
         let theme = if shot.step < PAGE_COUNT { Theme::Beige } else { Theme::Dark };
         let step = shot.step;
         let (frames, since, requested) = (shot.frames, shot.since, shot.requested);
-        if let Some(s) = self.shot.as_mut() {
-            s.frames += 1;
+        shot.frames += 1;
+        if !requested && frames >= 12 && since.elapsed() > Duration::from_millis(700) {
+            shot.requested = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(step)));
         }
         self.set_page(page);
         self.set_theme(theme);
-        if !requested && frames >= 12 && since.elapsed() > Duration::from_millis(700) {
-            if let Some(s) = self.shot.as_mut() {
-                s.requested = true;
-            }
-            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(step)));
-        }
         ctx.request_repaint_after(Duration::from_millis(30));
     }
 }
@@ -283,6 +304,17 @@ impl StudioApp {
 impl eframe::App for StudioApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         pal().bg.to_normalized_gamma_f32()
+    }
+
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        let Some(sc) = self.script.as_mut() else { return };
+        match sc.hook(raw) {
+            script::Action::None => {}
+            script::Action::Shot(name) => ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(name))),
+            script::Action::Page(n) => self.set_page(n.min(PAGE_COUNT - 1)),
+            script::Action::Dark(d) => self.set_theme(if d { Theme::Dark } else { Theme::Beige }),
+            script::Action::Close => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+        }
     }
 
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -298,7 +330,7 @@ impl eframe::App for StudioApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
         }
         if ctx.input(|i| i.viewport().close_requested()) && !self.closing {
-            let how = if snap.settings.close_to_tray && self.shot.is_none() { UiExit::Hidden } else { UiExit::Quit };
+            let how = if snap.settings.close_to_tray && (self.shot.is_none() || self.script.is_some()) { UiExit::Hidden } else { UiExit::Quit };
             *self.exit.lock().unwrap() = how;
             self.update_previews(false);
             self.closing = true;

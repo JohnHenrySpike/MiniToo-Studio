@@ -363,6 +363,36 @@ fn build() -> Snapshot {
     }
 }
 
+/// Everything empty / disconnected, to check the empty states.
+fn empty(mut s: Snapshot) -> Snapshot {
+    s.mode = DisplayMode::Idle;
+    s.live_on_device = None;
+    s.on_screen = "ничего (ожидание)".into();
+    s.last_transfer.clear();
+    s.mirror = Anim::default();
+    s.device = DeviceView { reported: s.device.reported.iter().map(|(k, _)| (k.clone(), "—".into())).collect(), away_enabled: true, away_brightness: 15, screen_on: true, brightness: 90, ..Default::default() };
+    s.image = ImageState::default();
+    s.screen.stale_portals = vec!["plasma-xdg-desktop-portal-kde.service".into()];
+    s.screen.error = Some("портал не ответил".into());
+    for m in &mut s.modes {
+        m.on_device = false;
+        m.in_rotation = false;
+        match &mut m.view {
+            ModeView::NowPlaying(n) => *n = NowPlayingView::default(),
+            ModeView::Github(g) => g.repos.clear(),
+            _ => {}
+        }
+    }
+    s.rotation = RotationState { interval: 30, ..Default::default() };
+    s.claude.sessions.clear();
+    s.claude.state = ClaudeState::Chilling;
+    s.claude.hooks_installed = false;
+    s.claude.listening = false;
+    s.claude.port_busy = true;
+    s.log = Arc::new(vec![]);
+    s
+}
+
 fn log(s: &mut Snapshot, line: String) {
     let mut l = (*s.log).clone();
     l.push(format!("{}  {line}", chrono::Local::now().format("%H:%M:%S")));
@@ -669,6 +699,9 @@ fn main() {
     let debug = flag("--debug");
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command>();
     let mut snap = build();
+    if flag("--empty") {
+        snap = empty(snap);
+    }
     snap.debug = debug;
     let shared = Arc::new(CoreShared { snapshot: RwLock::new(Arc::new(snap.clone())), tx, repaint: RwLock::new(None) });
     let core = CoreHandle(shared.clone());

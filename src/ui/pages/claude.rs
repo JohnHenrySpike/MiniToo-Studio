@@ -376,7 +376,7 @@ fn hooks_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
 
 pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     scroll_page(ui, "claude-page", None, |ui| {
-        let on = cx.snap.mode == DisplayMode::Claude;
+        let on = cx.snap.claude.mode_on || cx.snap.mode == DisplayMode::Claude;
         w::page_header(ui, "Claude", "статус Claude Code на экране колонки", |ui| {
             if w::switch(ui, on, "Показывать на колонке", true).clicked() {
                 cx.send(Command::SetClaudeMode(!on));

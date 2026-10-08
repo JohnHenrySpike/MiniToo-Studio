@@ -94,11 +94,11 @@ fn mock(ui: &mut Ui, cx: &mut Cx, origin: egui::Pos2) {
     let glass = w::paint_screen_frame(&painter, sf_min, 1.5, false, true);
     let mirror = &cx.snap.mirror;
     if !mirror.frames.is_empty() {
-        if d.screen_on {
-            if let Some((i, f)) = textures::anim_frame(ui.ctx(), mirror) {
-                let tex = cx.tex.frame(ui.ctx(), &format!("mirror/{i}"), f, false);
-                w::paint_texture(&painter, glass, tex, WHITE);
-            }
+        if d.screen_on
+            && let Some((i, f)) = textures::anim_frame(ui.ctx(), mirror)
+        {
+            let tex = cx.tex.frame(ui.ctx(), &format!("mirror/{i}"), f, false);
+            w::paint_texture(&painter, glass, tex, WHITE);
         }
     } else {
         let big = PixStyle::new(11).zoom(2);

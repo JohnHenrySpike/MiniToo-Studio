@@ -184,6 +184,9 @@ fn gallery(ui: &mut Ui, cx: &mut Cx, st: &mut State, rect: Rect) {
     let p = pal();
     let img = &cx.snap.image;
     w::paint_panel(ui.painter(), rect);
+    if cx.drag_hover && st.expanded {
+        ui.painter().rect_stroke(Rect::from_min_max(rect.min, rect.max - vec2(0.0, 3.0)), 12, Stroke::new(3.0, p.accent), StrokeKind::Inside);
+    }
     let inner = Rect::from_min_max(rect.min + vec2(12.0, 10.0), rect.max - vec2(12.0, 14.0));
     let folder_view = img.filter == GalleryFilter::Folder;
     let favorites = img.gallery.iter().filter(|g| g.favorite).count();

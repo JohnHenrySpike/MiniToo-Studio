@@ -77,7 +77,7 @@ pub fn show(ui: &mut Ui, snap: &Snapshot, current: usize, narrow: bool, theme: T
             pos2(rect.left() + if narrow { 4.0 } else { 12.0 }, rect.top() + sink),
             pos2(rect.right() - if narrow { 4.0 } else { 12.0 }, rect.bottom() - 3.0 + sink.min(0.0)),
         );
-        let cy = content.center().y - if is_cur || down { 0.0 } else { 0.0 };
+        let cy = content.center().y;
         let fg = if is_cur { WHITE } else { p.key_text };
         let sec = if is_cur { hex(0xffd2bd) } else { p.accent };
         let active = page_mode(i).is_some_and(|m| m == snap.mode);

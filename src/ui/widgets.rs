@@ -735,13 +735,13 @@ pub fn slider(ui: &mut Ui, value: f32, min: f32, max: f32, step: f32, width: f32
     let pad = 4.0;
     let avail = rect.width() - 2.0 * pad;
     let mut v = value.clamp(min, max);
-    if enabled && (resp.dragged() || resp.is_pointer_button_down_on()) {
-        if let Some(pos) = resp.interact_pointer_pos() {
-            let t = ((pos.x - rect.left() - pad - 7.0) / (avail - 14.0)).clamp(0.0, 1.0);
-            let raw = min + t * (max - min);
-            v = ((raw - min) / step).round() * step + min;
-            v = v.clamp(min, max);
-        }
+    if enabled
+        && (resp.dragged() || resp.is_pointer_button_down_on())
+        && let Some(pos) = resp.interact_pointer_pos()
+    {
+        let t = ((pos.x - rect.left() - pad - 7.0) / (avail - 14.0)).clamp(0.0, 1.0);
+        let raw = min + t * (max - min);
+        v = (((raw - min) / step).round() * step + min).clamp(min, max);
     }
     let pos = if max > min { (v - min) / (max - min) } else { 0.0 };
     let op = if enabled { 1.0 } else { 0.5 };

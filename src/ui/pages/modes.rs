@@ -395,7 +395,9 @@ fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
     let show_results = !v.results.is_empty() || (st.city_query.chars().count() >= 2 && !busy && !typed_pending);
     if show_results && !st.city_query.is_empty() || !v.results.is_empty() {
         let width = ui.available_width();
-        let h = if v.results.is_empty() { 40.0 } else { v.results.len() as f32 * 32.0 } + 8.0;
+        const NOTHING: &str = "Ничего не найдено. Попробуйте по-русски или по-английски.";
+        let nothing_h = w::galley_wrapped(ui, NOTHING, w::font(13.0), p.text_dim, width - 24.0).size().y;
+        let h = if v.results.is_empty() { nothing_h + 16.0 } else { v.results.len() as f32 * 32.0 } + 8.0;
         let (rect, _) = ui.allocate_exact_size(vec2(width, h), Sense::hover());
         w::well(ui.painter(), rect, 6.0, false);
         let inner = rect.shrink(4.0);
@@ -403,11 +405,8 @@ fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
         area(ui, inner, |ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
             if v.results.is_empty() {
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    ui.add_space(8.0);
-                    w::text(ui, "Ничего не найдено. Попробуйте по-русски или по-английски.", w::font(13.0), p.text_dim);
-                });
+                let r = Rect::from_min_size(inner.min + vec2(8.0, 8.0), vec2(inner.width() - 16.0, nothing_h));
+                area(ui, r, |ui| w::para(ui, NOTHING, w::font(13.0), p.text_dim));
             }
             for (i, c) in v.results.iter().enumerate() {
                 let label = if c.region.is_empty() { c.name.clone() } else { format!("{}  ·  {}", c.name, c.region) };
@@ -474,7 +473,8 @@ fn pomodoro_settings(ui: &mut Ui, cx: &mut Cx, v: &PomodoroView) {
             send_mode(cx, "pomodoro", ModeCommand::PomodoroReset);
         }
     });
-    let rows: [(&str, &str, u32, i64, fn(u32) -> ModeCommand); 3] = [
+    type Row<'a> = (&'a str, &'a str, u32, i64, fn(u32) -> ModeCommand);
+    let rows: [Row; 3] = [
         ("Фокус, мин", "pomo-work", v.work_min, 180, ModeCommand::PomodoroWork),
         ("Перерыв, мин", "pomo-break", v.break_min, 60, ModeCommand::PomodoroBreak),
         ("Длинный перерыв, мин", "pomo-long", v.long_min, 90, ModeCommand::PomodoroLong),
