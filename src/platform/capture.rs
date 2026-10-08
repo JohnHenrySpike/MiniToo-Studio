@@ -120,6 +120,7 @@ impl Shared {
         *self.latest.lock() = Some((n, Arc::new(img)));
     }
 
+    #[cfg(target_os = "linux")]
     fn stopped(&self) -> bool {
         self.finished.load(Ordering::SeqCst)
     }
