@@ -222,10 +222,6 @@ pub fn paint_icon(painter: &Painter, pos: Pos2, name: &str, zoom: u32, color: Co
     true
 }
 
-pub fn icon_exists(name: &str) -> bool {
-    crate::icons::template(name).is_some()
-}
-
 /// Icon centred in `rect`.
 pub fn paint_icon_centered(painter: &Painter, center: Pos2, name: &str, zoom: u32, color: Color32, secondary: Option<Color32>) {
     let s = 12.0 * zoom as f32;

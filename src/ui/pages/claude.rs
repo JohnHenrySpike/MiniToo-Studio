@@ -87,7 +87,7 @@ fn status_card(ui: &mut Ui, cx: &mut Cx) {
                 if w::switch(ui, c.interrupt, "Тревога поверх картинки и трансляции", true).clicked() {
                     cx.send(Command::SetInterrupt(!c.interrupt));
                 }
-                if w::switch(ui, c.idle_alerts, "«Ждёт ввода» после простоя — тоже тревога", true).clicked() {
+                if w::switch(ui, c.idle_alerts, "“Ждёт ввода” после простоя — тоже тревога", true).clicked() {
                     cx.send(Command::SetIdleAlerts(!c.idle_alerts));
                 }
                 let r = w::switch(ui, c.alert_caption, "Проект и вопрос на сцене «Ждёт вас»", true);
