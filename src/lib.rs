@@ -14,3 +14,4 @@ pub mod api;
 pub mod faces;
 pub mod notify_card;
 pub mod platform;
+pub mod ui;
