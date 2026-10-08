@@ -4,6 +4,7 @@ pub mod canvas;
 pub mod color;
 pub mod fonts;
 pub mod frame;
+pub mod gif;
 pub mod icons;
 pub mod pixelfont;
 pub mod protocol;
