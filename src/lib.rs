@@ -22,3 +22,4 @@ pub mod gallery;
 pub mod http;
 pub mod rotation;
 pub mod app;
+pub mod ui;

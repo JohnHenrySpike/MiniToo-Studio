@@ -2117,6 +2117,16 @@ impl Controller {
                 self.apply_rotation(fx);
             }
             Command::StartRotation => self.start_rotation(),
+            Command::StopRotation => {
+                if self.rotation.stop() {
+                    self.settings.set_bool("live/rotationOnStart", false);
+                }
+                self.stop_timer(TimerKind::RotationTick);
+            }
+            Command::ClearLog => {
+                self.log.clear();
+                self.log_arc = Arc::new(Vec::new());
+            }
             Command::RotationNext => {
                 let fx = self.rotation.next();
                 self.apply_rotation(fx);
@@ -2487,10 +2497,8 @@ impl Controller {
             DisplayMode::Screen => "трансляция экрана",
             DisplayMode::Claude => "статус Claude",
         };
-        let mut on_screen = format!("На экране: {mode_text}");
-        if self.interrupted {
-            on_screen.push_str("  •  тревога Claude");
-        }
+        // the UI prefixes «На экране: » and appends the Claude alert itself
+        let on_screen = mode_text.to_string();
         let scenes: Vec<SceneSet> = ClaudeState::ALL
             .iter()
             .map(|&st| {

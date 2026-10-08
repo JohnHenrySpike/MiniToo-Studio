@@ -318,7 +318,7 @@ pub struct Snapshot {
     pub interrupted: bool,
     pub overlay: bool,
     pub away: bool,
-    /// «На экране: …»
+    /// what is on the device, without the «На экране: » prefix
     pub on_screen: String,
     /// «Часы и погода: 4.2 КБ, 310 мс»
     pub last_transfer: String,
@@ -457,6 +457,12 @@ pub enum Command {
     SetPort(u16),
     InstallHooks,
     UninstallHooks,
+
+    // ---- added by the UI
+    /// stop the rotation; the current mode stays on the device
+    StopRotation,
+    /// clear the log shown in the right panel (`--debug`)
+    ClearLog,
 }
 
 /// Shared between the core and front-ends.

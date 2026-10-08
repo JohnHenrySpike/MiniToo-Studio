@@ -1,7 +1,7 @@
-//! The window. Temporary stand-in until the egui front-end lands: waits until "show" is
-//! requested again or the app quits.
+//! The window: the egui front-end in `minitoo::ui`.
 
 use minitoo::api::CoreHandle;
+use minitoo::ui::{self, UiExit, UiOptions};
 
 pub struct Options {
     pub debug: bool,
@@ -13,11 +13,10 @@ pub enum Exit {
     Quit,
 }
 
-pub fn run(core: CoreHandle, _opts: &Options) -> Exit {
-    loop {
-        if core.snapshot().quit {
-            return Exit::Quit;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(200));
+pub fn run(core: CoreHandle, opts: &Options) -> Exit {
+    let ui_opts = UiOptions { start_hidden: false, debug: opts.debug, screenshot_dir: opts.screenshot_dir.clone() };
+    match ui::run(core, &ui_opts) {
+        UiExit::Hidden => Exit::Hidden,
+        UiExit::Quit => Exit::Quit,
     }
 }
