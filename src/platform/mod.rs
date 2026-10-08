@@ -5,5 +5,6 @@ pub mod bluez;
 pub mod capture;
 pub mod icon_theme;
 pub mod notifications;
+pub mod pipewire_util;
 pub mod screensaver;
 pub mod tray;
