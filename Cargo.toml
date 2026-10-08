@@ -24,7 +24,7 @@ rfd = { version = "0.17", default-features = false, features = ["xdg-portal", "p
 tiny-skia = "0.12"
 ab_glyph = "0.2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "ico", "qoi", "tga", "pnm"] }
-resvg = { version = "0.48", default-features = false, features = ["text", "raster-images"] }
+resvg = { version = "0.48", default-features = false, features = ["text", "system-fonts", "raster-images"] }
 jxl-oxide = "0.12"
 zstd = "0.14"
 rustfft = "6"

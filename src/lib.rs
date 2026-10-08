@@ -16,3 +16,6 @@ pub mod notify_card;
 pub mod platform;
 pub mod transport;
 pub mod worker;
+pub mod media;
+pub mod gallery;
+pub mod http;
