@@ -4,10 +4,35 @@ use crate::canvas::{r, Align, Canvas};
 use crate::color::Color;
 use crate::fonts::FontSpec;
 use crate::frame::Frame;
+use crate::platform::notifications::{DesktopNotification, NotifyImage};
 
-/// Card for `app` / `summary` / `body` with the icon looked up by `icon` (theme name or path),
-/// then `app.to_lowercase()`, then `preferences-desktop-notification`. `time` is the time already formatted for display («20:48»).
-pub fn render(app: &str, summary: &str, body: &str, icon: &str, time: &str) -> Frame {
+/// Where the card icon may come from: what a desktop notification carries (§10). An empty
+/// source still finds the icon of the application by its name.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct IconSource<'a> {
+    /// `app_icon`: theme name, path or `file://` URL
+    pub app_icon: &'a str,
+    /// `desktop-entry` hint
+    pub desktop_entry: &'a str,
+    /// `image-path` hint
+    pub image_path: &'a str,
+    /// `image-data` hint
+    pub image: Option<&'a NotifyImage>,
+}
+
+impl<'a> IconSource<'a> {
+    pub fn named(app_icon: &'a str) -> Self {
+        IconSource { app_icon, ..Default::default() }
+    }
+
+    pub fn of(n: &'a DesktopNotification) -> Self {
+        IconSource { app_icon: &n.icon, desktop_entry: &n.desktop_entry, image_path: &n.image_path, image: n.image.as_ref() }
+    }
+}
+
+/// Card for `app` / `summary` / `body` with the icon of the sender (see [`card_icon`]).
+/// `time` is the time already formatted for display («20:48»).
+pub fn render(app: &str, summary: &str, body: &str, icon: IconSource, time: &str) -> Frame {
     let mut c = Canvas::device();
     c.fill(Color::hex(0x10121a));
     c.fill_round_rect(5.0, 6.0, 150.0, 116.0, 10.0, Color::hex(0x202432));
@@ -32,15 +57,30 @@ pub fn render(app: &str, summary: &str, body: &str, icon: &str, time: &str) -> F
     c.to_frame()
 }
 
-/// Icon search order of §10: theme name → file path → theme by `app.to_lowercase()` →
-/// `preferences-desktop-notification`. Rendered at 56 px and drawn into 28×28.
-fn card_icon(app: &str, icon: &str) -> Option<image::RgbaImage> {
-    use crate::platform::icon_theme::find_icon;
-    let lower = app.to_lowercase();
-    [icon, lower.as_str(), "preferences-desktop-notification"]
-        .into_iter()
-        .filter(|n| !n.trim().is_empty())
-        .find_map(|n| find_icon(n, 56))
+/// The icon of the sender, rendered at 56 px and drawn into 28×28. Search order:
+/// 1. `app_icon` (theme name or file);
+/// 2. `Icon=` of the desktop file named by `desktop-entry`, then that id as a theme name;
+/// 3. `Icon=` of the installed application called `app` (desktop file id, `StartupWMClass`,
+///    `Name`, program), then `app` itself as a theme name («Google Chrome» → `google-chrome`);
+/// 4. the notification's own picture: `image-path`, `image-data`;
+/// 5. `preferences-desktop-notification`.
+pub fn card_icon(app: &str, src: IconSource) -> Option<image::RgbaImage> {
+    use crate::platform::desktop_entry;
+    use crate::platform::icon_theme::{find_icon, fit_square};
+    const SIZE: u32 = 56;
+    let theme = |name: &str| -> Option<image::RgbaImage> { if name.trim().is_empty() { None } else { find_icon(name, SIZE) } };
+    let lower = app.trim().to_lowercase();
+    theme(src.app_icon)
+        .or_else(|| desktop_entry::icon_for_id(src.desktop_entry).and_then(|i| theme(&i)))
+        .or_else(|| theme(src.desktop_entry))
+        .or_else(|| desktop_entry::icon_for_app(app).and_then(|i| theme(&i)))
+        .or_else(|| theme(&lower.replace(' ', "-")))
+        .or_else(|| theme(src.image_path))
+        .or_else(|| {
+            let img = src.image?;
+            image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone()).map(|i| fit_square(&i, SIZE))
+        })
+        .or_else(|| theme("preferences-desktop-notification"))
 }
 
 /// Strips HTML tags, decodes `&amp; &lt; &gt;`, collapses whitespace.
@@ -111,8 +151,17 @@ mod tests {
 
     #[test]
     fn renders_card() {
-        let f = render("Telegram", "Анна", "Созвон переносим на 20:30, ок?", "", "12:00");
+        let f = render("Telegram", "Анна", "Созвон переносим на 20:30, ок?", IconSource::default(), "12:00");
         assert_eq!(f.pixel(0, 0), [0x10, 0x12, 0x1a]);
         assert_eq!(f.pixel(80, 120), [0x20, 0x24, 0x32]);
+    }
+
+    #[test]
+    fn falls_back_to_the_notification_image() {
+        let red = NotifyImage { width: 2, height: 2, rgba: [255, 0, 0, 255].repeat(4) };
+        let src = IconSource { image: Some(&red), ..Default::default() };
+        let img = card_icon("no such application 7f3a", src).unwrap();
+        assert_eq!((img.width(), img.height()), (56, 56));
+        assert_eq!(img.get_pixel(28, 28).0, [255, 0, 0, 255]);
     }
 }

@@ -12,8 +12,49 @@ pub struct DesktopNotification {
     pub app: String,
     pub summary: String,
     pub body: String,
-    /// `app_icon`, or the `desktop-entry` hint when it is empty
+    /// `app_icon`: a theme icon name, a path or a `file://` URL
     pub icon: String,
+    /// `desktop-entry` hint: the sender's desktop file id
+    pub desktop_entry: String,
+    /// `image-path` hint: an icon name or a file
+    pub image_path: String,
+    /// `image-data` hint (or the older `image_data` / `icon_data`)
+    pub image: Option<NotifyImage>,
+}
+
+/// Raw pixels of a notification, straight RGBA.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NotifyImage {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+}
+
+impl NotifyImage {
+    /// From the `(iiibiiay)` of the spec: width, height, rowstride, has alpha, bits per
+    /// sample (8), channels (3 or 4), data.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    fn from_wire(v: &wire::Value) -> Option<Self> {
+        use wire::Value;
+        let Value::Struct(f) = v else { return None };
+        let int = |i: usize| match f.get(i) {
+            Some(Value::Int(n)) if *n >= 0 => Some(*n as usize),
+            _ => None,
+        };
+        let (w, h, stride, bps, channels) = (int(0)?, int(1)?, int(2)?, int(4)?, int(5)?);
+        let Some(Value::Bytes(data)) = f.get(6) else { return None };
+        if bps != 8 || !(3..=4).contains(&channels) || w == 0 || h == 0 || w > 1024 || h > 1024 || stride < w * channels {
+            return None;
+        }
+        let mut rgba = Vec::with_capacity(w * h * 4);
+        for y in 0..h {
+            let row = data.get(y * stride..y * stride + w * channels)?;
+            for px in row.chunks_exact(channels) {
+                rgba.extend_from_slice(&[px[0], px[1], px[2], if channels == 4 { px[3] } else { 255 }]);
+            }
+        }
+        Some(NotifyImage { width: w as u32, height: h as u32, rgba })
+    }
 }
 
 pub type NotifySink = Arc<dyn Fn(Result<DesktopNotification, String>) + Send + Sync>;
@@ -61,25 +102,21 @@ fn notification_from_args(args: &[wire::Value]) -> Option<DesktopNotification> {
         Some(Value::Str(s)) => Some(s.clone()),
         _ => None,
     };
-    let app = s(0)?;
-    let _replaces_id = args.get(1);
-    let mut icon = s(2)?;
-    let summary = s(3)?;
-    let body = s(4)?;
-    if icon.is_empty()
-        && let Some(Value::Array(hints)) = args.get(6)
-    {
+    let mut n = DesktopNotification { app: s(0)?, icon: s(2)?, summary: s(3)?, body: s(4)?, ..Default::default() };
+    if let Some(Value::Array(hints)) = args.get(6) {
         for h in hints {
-            if let Value::DictEntry(k, v) = h
-                && matches!(&**k, Value::Str(k) if k == "desktop-entry")
-                && let Value::Variant(v) = &**v
-                && let Value::Str(entry) = &**v
-            {
-                icon = entry.clone();
+            let Value::DictEntry(k, v) = h else { continue };
+            let (Value::Str(k), Value::Variant(v)) = (&**k, &**v) else { continue };
+            match (k.as_str(), &**v) {
+                ("desktop-entry", Value::Str(e)) => n.desktop_entry = e.clone(),
+                ("image-path" | "image_path", Value::Str(p)) => n.image_path = p.clone(),
+                ("image-data", v) => n.image = NotifyImage::from_wire(v).or(n.image.take()),
+                ("image_data" | "icon_data", v) if n.image.is_none() => n.image = NotifyImage::from_wire(v),
+                _ => {}
             }
         }
     }
-    Some(DesktopNotification { app, summary, body, icon })
+    Some(n)
 }
 
 /// Minimal D-Bus message (un)marshalling.
@@ -562,22 +599,31 @@ mod tests {
                 app: "MiniToo probe".into(),
                 summary: "MiniToo test".into(),
                 body: "hello <b>world</b> &amp; co".into(),
-                icon: "org.kde.konsole".into(),
+                desktop_entry: "org.kde.konsole".into(),
+                ..Default::default()
             }
         );
     }
 
     #[test]
-    fn app_icon_wins_over_desktop_entry() {
-        let hint = Value::DictEntry(
-            Box::new(Value::Str("desktop-entry".into())),
-            Box::new(Value::Variant(Box::new(Value::Str("firefox".into())))),
-        );
+    fn reads_icon_hints() {
+        let hint = |k: &str, v: Value| Value::DictEntry(Box::new(Value::Str(k.into())), Box::new(Value::Variant(Box::new(v))));
         let s = |v: &str| Value::Str(v.into());
-        let mut args = vec![s("Firefox"), Value::UInt(0), s("dialog-information"), s("Hi"), s(""), Value::Array(vec![]), Value::Array(vec![hint]), Value::Int(5000)];
-        assert_eq!(notification_from_args(&args).unwrap().icon, "dialog-information");
-        args[2] = s("");
-        assert_eq!(notification_from_args(&args).unwrap().icon, "firefox");
+        // 2×1 RGB with a padded row: rowstride 8
+        let data = Value::Struct(vec![
+            Value::Int(2),
+            Value::Int(1),
+            Value::Int(8),
+            Value::Bool(false),
+            Value::Int(8),
+            Value::Int(3),
+            Value::Bytes(vec![1, 2, 3, 4, 5, 6, 0, 0]),
+        ]);
+        let hints = vec![hint("desktop-entry", s("firefox")), hint("image-path", s("/tmp/a.png")), hint("image-data", data), hint("urgency", Value::Byte(1))];
+        let args = vec![s("Firefox"), Value::UInt(0), s(""), s("Hi"), s(""), Value::Array(vec![]), Value::Array(hints), Value::Int(5000)];
+        let n = notification_from_args(&args).unwrap();
+        assert_eq!((n.icon.as_str(), n.desktop_entry.as_str(), n.image_path.as_str()), ("", "firefox", "/tmp/a.png"));
+        assert_eq!(n.image, Some(NotifyImage { width: 2, height: 1, rgba: vec![1, 2, 3, 255, 4, 5, 6, 255] }));
         assert!(notification_from_args(&args[..3]).is_none());
     }
 

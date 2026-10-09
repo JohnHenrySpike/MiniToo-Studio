@@ -85,7 +85,8 @@ pub fn load_file(path: &Path, size: u32) -> Option<RgbaImage> {
     Some(fit_square(&img, size))
 }
 
-fn fit_square(img: &RgbaImage, size: u32) -> RgbaImage {
+/// Scales to fit `size`×`size`, keeping the aspect ratio, centred on a transparent square.
+pub fn fit_square(img: &RgbaImage, size: u32) -> RgbaImage {
     if img.width() == size && img.height() == size {
         return img.clone();
     }

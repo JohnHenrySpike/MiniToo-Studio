@@ -123,8 +123,8 @@ fn main() {
     save(dir, "stats3_claudestats", &claudestats::frame(&sessions[2..4], &totals));
 
     // notification cards
-    use minitoo::notify_card::render;
-    save(dir, "card1", &render("Telegram", "Анна", "Созвон переносим на 20:30, ок?", "", "00:49"));
+    use minitoo::notify_card::{IconSource, render};
+    save(dir, "card1", &render("Telegram", "Анна", "Созвон переносим на 20:30, ок?", IconSource::default(), "00:49"));
     save(
         dir,
         "card2",
@@ -132,11 +132,11 @@ fn main() {
             "build",
             "Сборка готова с очень длинным заголовком",
             "<b>0 ошибок</b> &amp; 3 предупреждения, сборка заняла 2 минуты 14 секунд, артефакты загружены в хранилище, можно выкатывать на прод &lt;скоро&gt;",
-            "",
+            IconSource::default(),
             "00:49",
         ),
     );
-    save(dir, "card3", &render("firefox", "", "Загрузка завершена", "", "00:49"));
-    save(dir, "card4", &render("x", "Иконка-путь", "тест", "/usr/share/icons/hicolor/48x48/apps/firefox.png", "00:49"));
-    save(dir, "card5", &render("Pomodoro", "Время перерыва", "Фокус завершён. Отдохните 5 мин.", "chronometer", "00:49"));
+    save(dir, "card3", &render("firefox", "", "Загрузка завершена", IconSource::default(), "00:49"));
+    save(dir, "card4", &render("x", "Иконка-путь", "тест", IconSource::named("/usr/share/icons/hicolor/48x48/apps/firefox.png"), "00:49"));
+    save(dir, "card5", &render("Pomodoro", "Время перерыва", "Фокус завершён. Отдохните 5 мин.", IconSource::named("chronometer"), "00:49"));
 }

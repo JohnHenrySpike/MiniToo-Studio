@@ -1414,7 +1414,7 @@ impl Controller {
             return;
         }
         self.add_log(tr!("log.notification", app = app, text = summary));
-        let card = notify_card::render(app, summary, body, &n.icon, &crate::i18n::time_hm(&Local::now()));
+        let card = notify_card::render(app, summary, body, notify_card::IconSource::of(n), &crate::i18n::time_hm(&Local::now()));
         self.show_overlay(card, self.notify_duration as u64 * 1000);
     }
 
@@ -1914,7 +1914,7 @@ impl Controller {
             }
             Command::DeviceNotifyCard { app, text } => {
                 self.add_log(tr!("log.notification", app = app, text = text));
-                let card = notify_card::render(&app, "", &text, &app.to_lowercase(), &crate::i18n::time_hm(&Local::now()));
+                let card = notify_card::render(&app, "", &text, notify_card::IconSource::default(), &crate::i18n::time_hm(&Local::now()));
                 self.show_overlay(card, self.notify_duration as u64 * 1000);
             }
             Command::DeviceNotifyIcon { app } => {
@@ -2397,7 +2397,7 @@ impl Controller {
                 let s = |k: &str, d: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or(d).to_string();
                 let (app, summary, body, icon) = (s("app", "minitoo"), s("summary", ""), s("body", ""), s("icon", ""));
                 self.add_log(tr!("log.notification", app = app, text = summary));
-                let card = notify_card::render(&app, &summary, &body, &icon, &crate::i18n::time_hm(&Local::now()));
+                let card = notify_card::render(&app, &summary, &body, notify_card::IconSource::named(&icon), &crate::i18n::time_hm(&Local::now()));
                 self.show_overlay(card, self.notify_duration as u64 * 1000);
                 Response::ok()
             }

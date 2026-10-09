@@ -163,7 +163,7 @@ impl Pomodoro {
         };
         cx.log(tr!("pomodoro.log.phase_end", title = title));
         let time = crate::i18n::time_hm(&cx.now());
-        cx.overlay(crate::notify_card::render("Pomodoro", title, &body, "chronometer", &time), 8000);
+        cx.overlay(crate::notify_card::render("Pomodoro", title, &body, crate::notify_card::IconSource::named("chronometer"), &time), 8000);
     }
 
     /// The face with `remaining` seconds left in the current phase.
