@@ -11,11 +11,17 @@ use minitoo::color::Color;
 use minitoo::fonts::FontSpec;
 use minitoo::frame::Frame;
 use minitoo::live::{City, ClockView, GithubView, ModeCommand, ModeView, NowPlayingView, PomodoroView, RepoView, RunState, VisualizerView};
+use minitoo::tr;
 use minitoo::ui::{UiExit, UiOptions};
 use parking_lot::RwLock;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+/// Mock text in the language of the window (Russian or English).
+fn loc(ru: &'static str, en: &'static str) -> &'static str {
+    if minitoo::i18n::current().code == "ru" { ru } else { en }
+}
 
 const PINK: Color = Color::hex(0xff3cac);
 const CYAN: Color = Color::hex(0x38e8ff);
@@ -46,7 +52,7 @@ fn clock_frame(colon: bool) -> Frame {
 fn sysmon_frame(cpu: f32) -> Frame {
     let mut c = Canvas::device();
     c.fill(Color::hex(0x0a0e16));
-    c.text_tl(8.0, 2.0, "Система", FontSpec::bold(12.0), Color::WHITE);
+    c.text_tl(8.0, 2.0, loc("Система", "System"), FontSpec::bold(12.0), Color::WHITE);
     c.text(r(100.0, 2.0, 52.0, 14.0), Align::RIGHT, "20:48", FontSpec::sans(10.0), Color::hex(0x96a0b4));
     let rows = [("CPU", cpu, Color::hex(0x5ac878)), ("GPU", 0.32, Color::hex(0xf0aa3c)), ("RAM", 0.41, Color::hex(0x6e96f0)), ("VRAM", 0.18, Color::hex(0xb478e6))];
     for (i, (name, v, col)) in rows.iter().enumerate() {
@@ -84,7 +90,7 @@ fn pomodoro_frame() -> Frame {
     c.arc(80.0, 56.0, 42.5, 0.0, 360.0, 7.0, Color::ACCENT.darker(3.2), LineCap::Round);
     c.arc(80.0, 56.0, 42.5, 90.0, -250.0, 7.0, Color::ACCENT, LineCap::Round);
     c.text(r(0.0, 38.0, 160.0, 28.0), Align::CENTER, "25:00", FontSpec::bold(24.0), Color::WHITE);
-    c.text(r(0.0, 64.0, 160.0, 14.0), Align::CENTER, "фокус · пауза", FontSpec::sans(10.0), Color::ACCENT.lighter(1.4));
+    c.text(r(0.0, 64.0, 160.0, 14.0), Align::CENTER, loc("фокус · пауза", "focus · paused"), FontSpec::sans(10.0), Color::ACCENT.lighter(1.4));
     for i in 0..4 {
         c.fill_circle(59.0 + 14.0 * i as f32, 116.0, 4.0, if i == 0 { Color::ACCENT } else { Color::ACCENT.darker(3.0) });
     }
@@ -97,7 +103,7 @@ fn stats_frame() -> Frame {
     c.fill_rect(0.0, 0.0, 160.0, 20.0, Color::ACCENT);
     c.text_tl(6.0, 3.0, "Claude Code", FontSpec::bold(12.0), Color::hex(0x1e120e));
     c.text(r(120.0, 3.0, 34.0, 14.0), Align::RIGHT, "2", FontSpec::bold(12.0), Color::hex(0x1e120e));
-    let rows = [("divoom", "работает", Color::ACCENT), ("website", "ждёт вас", Color::hex(0xe64030))];
+    let rows = [("divoom", loc("работает", "working"), Color::ACCENT), ("website", loc("ждёт вас", "needs you"), Color::hex(0xe64030))];
     for (i, (p, s, col)) in rows.iter().enumerate() {
         let y = 26.0 + i as f32 * 20.0;
         c.fill_circle(10.0, y + 7.0, 4.0, *col);
@@ -105,9 +111,9 @@ fn stats_frame() -> Frame {
         c.text(r(90.0, y, 64.0, 14.0), Align::RIGHT, s, FontSpec::sans(10.0), *col);
     }
     c.line(6.0, 90.0, 154.0, 90.0, 1.0, Color::hex(0x373241));
-    c.text_tl(6.0, 96.0, "сегодня", FontSpec::sans(9.0), Color::hex(0x9691a5));
-    c.text(r(60.0, 94.0, 94.0, 16.0), Align::RIGHT, "62.3M ток.", FontSpec::bold(13.0), Color::WHITE);
-    c.text_tl(6.0, 114.0, "ответов 412", FontSpec::sans(9.0), Color::hex(0x9691a5));
+    c.text_tl(6.0, 96.0, loc("сегодня", "today"), FontSpec::sans(9.0), Color::hex(0x9691a5));
+    c.text(r(60.0, 94.0, 94.0, 16.0), Align::RIGHT, loc("62.3M ток.", "62.3M tok."), FontSpec::bold(13.0), Color::WHITE);
+    c.text_tl(6.0, 114.0, loc("ответов 412", "replies 412"), FontSpec::sans(9.0), Color::hex(0x9691a5));
     c.to_frame()
 }
 
@@ -204,12 +210,12 @@ fn build() -> Snapshot {
         view,
     };
     let modes = vec![
-        mode("clock", "Часы и погода", "время, дата, Open-Meteo", "clock", "укажите город для погоды", clock_frame(true), clock_view(1, None, vec![]), true),
-        mode("sysmon", "Системный монитор", "CPU, GPU, память, температуры", "sysmon", "CPU 12%  ·  RAM 3.9 ГБ", sysmon_frame(0.12), ModeView::None, true),
+        mode("clock", tr!("clock.title"), tr!("clock.subtitle"), "clock", tr!("clock.status.no_city"), clock_frame(true), clock_view(1, None, vec![]), true),
+        mode("sysmon", tr!("sysmon.title"), tr!("sysmon.subtitle"), "sysmon", &tr!("sysmon.status", cpu = 12, ram = "3.9"), sysmon_frame(0.12), ModeView::None, true),
         mode(
             "nowplaying",
-            "Сейчас играет",
-            "обложка и трек из любого плеера (MPRIS)",
+            tr!("nowplaying.title"),
+            tr!("nowplaying.subtitle"),
             "music",
             "Spotify: M83 — Midnight City",
             nowplaying_frame(),
@@ -219,26 +225,35 @@ fn build() -> Snapshot {
         mode(
             "pomodoro",
             "Pomodoro",
-            "фокус 25 мин, перерыв 5 мин",
+            tr!("pomodoro.subtitle"),
             "timer",
-            "фокус 25:00 (пауза)",
+            &tr!("pomodoro.status_paused", phase = tr!("pomodoro.phase.work"), time = "25:00"),
             pomodoro_frame(),
             ModeView::Pomodoro(PomodoroView { remaining: 1500, cycle: 1, work_min: 25, break_min: 5, long_min: 15, ..Default::default() }),
             false,
         ),
-        mode("claudestats", "Статистика Claude", "сессии и токены за сегодня", "sparkle", "сегодня: 62.3M токенов (вход 510K, выход 1.2M, кэш 60.6M), ответов 412, запросов 37", stats_frame(), ModeView::None, false),
+        mode(
+            "claudestats",
+            tr!("claudestats.title"),
+            tr!("claudestats.subtitle"),
+            "sparkle",
+            loc("сегодня: 62.3M токенов (вход 510K, выход 1.2M, кэш 60.6M), ответов 412, запросов 37", "today: 62.3M tokens (input 510K, output 1.2M, cache 60.6M), replies 412, requests 37"),
+            stats_frame(),
+            ModeView::None,
+            false,
+        ),
         mode(
             "github",
             "GitHub Actions",
-            "последние запуски CI по репозиториям",
+            tr!("github.subtitle"),
             "branch",
-            "упавших: 1 из 3",
+            &tr!("github.status.failing", failing = 1, total = 3),
             github_frame(),
             ModeView::Github(GithubView {
                 repos: vec![
-                    RepoView { name: "cli/cli".into(), state: RunState::Passed, detail: "успешно  ·  CI #8123 (trunk)".into(), url: String::new() },
-                    RepoView { name: "neovim/neovim".into(), state: RunState::Failed, detail: "упал  ·  test #4410 (master)".into(), url: String::new() },
-                    RepoView { name: "rust-lang/rust".into(), state: RunState::Running, detail: "идёт  ·  CI #99120 (master)".into(), url: String::new() },
+                    RepoView { name: "cli/cli".into(), state: RunState::Passed, detail: loc("успешно  ·  CI #8123 (trunk)", "passed  ·  CI #8123 (trunk)").into(), url: String::new() },
+                    RepoView { name: "neovim/neovim".into(), state: RunState::Failed, detail: loc("упал  ·  test #4410 (master)", "failed  ·  test #4410 (master)").into(), url: String::new() },
+                    RepoView { name: "rust-lang/rust".into(), state: RunState::Running, detail: loc("идёт  ·  CI #99120 (master)", "running  ·  CI #99120 (master)").into(), url: String::new() },
                 ],
                 has_token: false,
                 add_error: None,
@@ -246,7 +261,7 @@ fn build() -> Snapshot {
             }),
             false,
         ),
-        mode("visualizer", "Визуализатор звука", "спектр того, что играет на компьютере", "wave", "слушаю системный звук", visualizer_frame(0.0), ModeView::Visualizer(VisualizerView { style: 0, error: None }), false),
+        mode("visualizer", tr!("visualizer.title"), tr!("visualizer.subtitle"), "wave", tr!("visualizer.listening"), visualizer_frame(0.0), ModeView::Visualizer(VisualizerView { style: 0, error: None }), false),
     ];
     let sessions = vec![
         Session {
@@ -279,8 +294,8 @@ fn build() -> Snapshot {
         page: 0,
         mode: DisplayMode::Live,
         live_on_device: Some("clock"),
-        on_screen: "Часы и погода".into(),
-        last_transfer: "Часы и погода: 4.2 КБ, 310 мс".into(),
+        on_screen: tr!("clock.title").into(),
+        last_transfer: loc("Часы и погода: 4.2 КБ, 310 мс", "Clock and weather: 4.2 KB, 310 ms").into(),
         mirror: Anim { frames: Arc::new(vec![clock_frame(true), clock_frame(false)]), speed: 1000, revision: 1 },
         device: DeviceView {
             conn: Conn::Connected,
@@ -290,14 +305,14 @@ fn build() -> Snapshot {
             volume: Some(7),
             playing: Some(false),
             reported: vec![
-                ("Громкость".into(), "7 / 15".into()),
-                ("Яркость".into(), "80%".into()),
-                ("Источник звука".into(), "Bluetooth".into()),
-                ("SD-карта".into(), "нет".into()),
-                ("Автовыключение".into(), "30 мин".into()),
-                ("Формат времени".into(), "24 ч".into()),
-                ("Автоподключение".into(), "да".into()),
-                ("Звук уведомлений".into(), "№ 2".into()),
+                (loc("Громкость", "Volume").into(), "7 / 15".into()),
+                (loc("Яркость", "Brightness").into(), "80%".into()),
+                (loc("Источник звука", "Audio source").into(), "Bluetooth".into()),
+                (loc("SD-карта", "SD card").into(), loc("нет", "none").into()),
+                (loc("Автовыключение", "Auto power-off").into(), loc("30 мин", "30 min").into()),
+                (loc("Формат времени", "Time format").into(), loc("24 ч", "24-hour").into()),
+                (loc("Автоподключение", "Auto-connect").into(), loc("да", "yes").into()),
+                (loc("Звук уведомлений", "Notification sound").into(), loc("№ 2", "#2").into()),
             ],
             heartbeat: Some("f7 01 00 5a 22 (20:48:11)".into()),
             away_enabled: true,
@@ -338,7 +353,7 @@ fn build() -> Snapshot {
         },
         screen: ScreenState { fps: 5, quality: 1, crisp: false, region: NRect::FULL, ..Default::default() },
         modes,
-        rotation: RotationState { running: true, interval: 30, checked: 3, paused: false, progress: 0.3, seconds_left: 21, next_title: "Системный монитор".into() },
+        rotation: RotationState { running: true, interval: 30, checked: 3, paused: false, progress: 0.3, seconds_left: 21, next_title: tr!("sysmon.title").into() },
         notify: NotifyState { enabled: false, duration: 6, ignore: vec!["Spectacle".into()], error: None },
         claude: ClaudeView {
             mode_on: false,
@@ -358,9 +373,9 @@ fn build() -> Snapshot {
             snippet: minitoo::claude::hooks_snippet(47800),
         },
         log: Arc::new(vec![
-            "20:47:58  подключено".into(),
-            "20:48:00  Часы и погода: 4.2 КБ, 310 мс".into(),
-            "20:48:05  заряд колонки: 90%".into(),
+            loc("20:47:58  подключено", "20:47:58  connected").into(),
+            loc("20:48:00  Часы и погода: 4.2 КБ, 310 мс", "20:48:00  Clock and weather: 4.2 KB, 310 ms").into(),
+            loc("20:48:05  заряд колонки: 90%", "20:48:05  speaker battery: 90%").into(),
         ]),
         http_listening: true,
         ..Default::default()
@@ -371,13 +386,13 @@ fn build() -> Snapshot {
 fn empty(mut s: Snapshot) -> Snapshot {
     s.mode = DisplayMode::Idle;
     s.live_on_device = None;
-    s.on_screen = "ничего (ожидание)".into();
+    s.on_screen = tr!("app.on_screen.idle").into();
     s.last_transfer.clear();
     s.mirror = Anim::default();
     s.device = DeviceView { reported: s.device.reported.iter().map(|(k, _)| (k.clone(), "—".into())).collect(), away_enabled: true, away_brightness: 15, screen_on: true, brightness: 90, ..Default::default() };
     s.image = ImageState::default();
     s.screen.stale_portals = vec!["plasma-xdg-desktop-portal-kde.service".into()];
-    s.screen.error = Some("портал не ответил".into());
+    s.screen.error = Some(loc("портал не ответил", "the portal did not respond").into());
     for m in &mut s.modes {
         m.on_device = false;
         m.in_rotation = false;
@@ -478,8 +493,8 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
         Command::SendImage => {
             s.mirror = Anim { frames: s.image.preview.frames.clone(), speed: s.image.preview.speed, revision: s.mirror.revision + 1 };
             s.mode = DisplayMode::Image;
-            s.on_screen = "изображение".into();
-            s.last_transfer = "12.0 КБ, 6 кадр., 800 мс".into();
+            s.on_screen = loc("изображение", "image").into();
+            s.last_transfer = loc("12.0 КБ, 6 кадр., 800 мс", "12.0 KB, 6 frames, 800 ms").into();
             s.rotation.running = false;
             for m in &mut s.modes {
                 m.on_device = false;
@@ -511,7 +526,7 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
             {
                 s.mirror = Anim { frames: Arc::new(vec![t.clone()]), speed: 1000, revision: s.mirror.revision + 1 };
                 s.mode = DisplayMode::Image;
-                s.on_screen = "изображение".into();
+                s.on_screen = loc("изображение", "image").into();
             }
         }
         Command::SetFolder(f) => s.image.folder = f,
@@ -536,7 +551,7 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
         Command::StartStream => {
             s.screen.streaming = true;
             s.mode = DisplayMode::Screen;
-            s.on_screen = "трансляция экрана".into();
+            s.on_screen = loc("трансляция экрана", "screen stream").into();
         }
         Command::StopStream => s.screen.streaming = false,
         Command::SetFps(f) => s.screen.fps = f,
@@ -553,7 +568,7 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
             for m in &mut s.modes {
                 m.on_device = false;
             }
-            s.on_screen = "ничего (ожидание)".into();
+            s.on_screen = tr!("app.on_screen.idle").into();
         }
         Command::SetRotationMember(id, on) => {
             if let Some(m) = find_mode(s, &id) {
@@ -580,21 +595,21 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
                     (ModeView::Clock(c), ModeCommand::ClockSearch(q)) => {
                         c.results = if q.chars().count() >= 2 {
                             vec![
-                                City { name: format!("{q}град"), region: "Россия, Центральный".into(), lat: 55.0, lon: 37.0 },
-                                City { name: format!("{q}ск"), region: "Россия".into(), lat: 54.0, lon: 36.0 },
+                                City { name: format!("{q}ville"), region: loc("Россия, Центральный", "France, Île-de-France").into(), lat: 55.0, lon: 37.0 },
+                                City { name: format!("{q}ton"), region: loc("Россия", "United Kingdom").into(), lat: 54.0, lon: 36.0 },
                             ]
                         } else {
                             vec![]
                         }
                     }
                     (ModeView::Clock(c), ModeCommand::ClockPickCity(city)) => {
-                        m.status = format!("{}: 12°, малооблачно, обновлено 20:48", city.name);
+                        m.status = tr!("clock.status.weather", city = city.name, temp = 12, sky = loc("малооблачно", "partly cloudy"), time = "20:48");
                         c.city = Some(city);
                         c.results.clear();
                     }
                     (ModeView::Clock(c), ModeCommand::ClockClearCity) => {
                         c.city = None;
-                        m.status = "укажите город для погоды".into();
+                        m.status = tr!("clock.status.no_city").into();
                     }
                     (ModeView::Pomodoro(p), ModeCommand::PomodoroStartPause) => p.running = !p.running,
                     (ModeView::Pomodoro(p), ModeCommand::PomodoroWork(v)) => p.work_min = v,
@@ -605,12 +620,12 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
                     (ModeView::Github(g), ModeCommand::GithubRemove(r)) => g.repos.retain(|x| x.name != r),
                     (ModeView::Github(g), ModeCommand::GithubAdd(r)) => {
                         if !r.contains('/') {
-                            g.add_error = Some("нужно owner/repo или ссылка на репозиторий".into());
+                            g.add_error = Some(loc("нужно owner/repo или ссылка на репозиторий", "owner/repo or a repository link is needed").into());
                         } else if g.repos.len() >= 4 {
-                            g.add_error = Some("на экране помещается 4 репозитория".into());
+                            g.add_error = Some(loc("на экране помещается 4 репозитория", "the screen fits 4 repositories").into());
                         } else {
                             g.add_error = None;
-                            g.repos.push(RepoView { name: r, state: RunState::Loading, detail: "загрузка…".into(), url: String::new() });
+                            g.repos.push(RepoView { name: r, state: RunState::Loading, detail: loc("загрузка…", "loading…").into(), url: String::new() });
                         }
                     }
                     (ModeView::Github(g), ModeCommand::GithubToken(_)) => g.has_token = true,
@@ -623,7 +638,7 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
             s.claude.mode_on = on;
             if on {
                 s.mode = DisplayMode::Claude;
-                s.on_screen = "статус Claude".into();
+                s.on_screen = loc("статус Claude", "Claude status").into();
                 s.rotation.running = false;
                 let st = s.claude.state;
                 if let Some(set) = s.claude.scenes.iter().find(|x| x.state == st) {
@@ -663,11 +678,11 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
         }
         Command::InstallHooks => {
             s.claude.hooks_installed = true;
-            s.claude.hooks_message = Some((true, "Хуки установлены в ~/.claude/settings.json".into()));
+            s.claude.hooks_message = Some((true, loc("Хуки установлены в ~/.claude/settings.json", "Hooks installed in ~/.claude/settings.json").into()));
         }
         Command::UninstallHooks => {
             s.claude.hooks_installed = false;
-            s.claude.hooks_message = Some((true, "Хуки удалены".into()));
+            s.claude.hooks_message = Some((true, loc("Хуки удалены", "Hooks removed").into()));
         }
         Command::ClearLog => s.log = Arc::new(vec![]),
         _ => {}
@@ -706,6 +721,8 @@ fn desktop(t: f32) -> Arc<image::RgbaImage> {
 }
 
 fn main() {
+    // the system language (LANG), as the app does without a saved choice
+    minitoo::i18n::set_language("auto");
     let args: Vec<String> = std::env::args().collect();
     let flag = |f: &str| args.iter().any(|a| a == f);
     let shot = args.iter().position(|a| a == "--screenshot").and_then(|i| args.get(i + 1)).map(PathBuf::from);
@@ -761,7 +778,7 @@ fn main() {
                 if let Some(m) = find_mode(&mut s, "sysmon") {
                     let cpu = 0.1 + 0.3 * (t * 0.5).sin().abs();
                     m.frame = Some(sysmon_frame(cpu));
-                    m.status = format!("CPU {}%  ·  RAM 3.9 ГБ", (cpu * 100.0) as i32);
+                    m.status = tr!("sysmon.status", cpu = (cpu * 100.0) as i32, ram = "3.9");
                     m.revision += 1;
                 }
                 if s.screen.status == CaptureStatus::Capturing {

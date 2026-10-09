@@ -23,7 +23,8 @@ cat > "$apps/minitoo-studio.desktop" <<DESKTOP
 Type=Application
 Name=MiniToo Studio
 GenericName=Divoom MiniToo
-Comment=Изображения, трансляция экрана и статус Claude Code на Divoom MiniToo
+Comment=Pictures, screen mirroring and Claude Code status on a Divoom MiniToo
+Comment[ru]=Изображения, трансляция экрана и статус Claude Code на Divoom MiniToo
 Exec=$root/build/minitoo-studio
 Icon=minitoo-studio
 Categories=Utility;
