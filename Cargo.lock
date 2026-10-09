@@ -2910,6 +2910,7 @@ dependencies = [
  "serde_json",
  "serialport",
  "sha1_smol",
+ "skrifa",
  "sysinfo",
  "tiny-skia",
  "tokio",

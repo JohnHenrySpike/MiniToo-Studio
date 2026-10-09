@@ -350,6 +350,7 @@ impl eframe::App for StudioApp {
         let snap = self.core.snapshot();
         let p = Palette::of(self.theme);
         set_pal(p);
+        pixel::set_pixels_per_point(ctx.pixels_per_point());
         if self.styled != Some(self.theme) {
             theme::apply_style(&ctx, &p);
             self.styled = Some(self.theme);

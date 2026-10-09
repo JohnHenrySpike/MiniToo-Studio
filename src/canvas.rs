@@ -1,5 +1,6 @@
 //! Raster canvas for device screens (and anything else drawn offscreen): a thin, QPainter-like
-//! layer over tiny-skia plus DejaVu text rendered with ab_glyph.
+//! layer over tiny-skia plus DejaVu text rendered with ab_glyph (hinted with skrifa when not
+//! anti-aliased).
 //!
 //! Coordinates are in pixels, `f32`, origin top-left, like QPainter.
 
@@ -450,9 +451,10 @@ impl Canvas {
         for ch in text.chars() {
             let id = face.glyph_id(ch);
             if let Some(p) = prev {
-                w += sf.kern(p, id);
+                let k = sf.kern(p, id);
+                w += if font.aa { k } else { k.round() };
             }
-            w += sf.h_advance(id);
+            w += if font.aa { sf.h_advance(id) } else { crate::fonts::mono_glyph(&font, ch).advance };
             prev = Some(id);
         }
         w
@@ -537,6 +539,9 @@ impl Canvas {
     /// Draws one line of text with its baseline at `baseline`, starting at `x`. Returns the
     /// advance width.
     pub fn text_at(&mut self, x: f32, baseline: f32, text: &str, font: FontSpec, c: Color) -> f32 {
+        if !font.aa {
+            return self.text_at_mono(x, baseline, text, font, c);
+        }
         let face = font.face();
         let scale = font.scale();
         let sf = face.as_scaled(scale);
@@ -572,6 +577,32 @@ impl Canvas {
             prev = Some(id);
         }
         pen - x
+    }
+
+    /// `text_at` without anti-aliasing: hinted monochrome glyphs on whole pixels.
+    fn text_at_mono(&mut self, x: f32, baseline: f32, text: &str, font: FontSpec, c: Color) -> f32 {
+        let face = font.face();
+        let sf = face.as_scaled(font.scale());
+        let mut paint = Paint::default();
+        paint.set_color(c.to_skia());
+        paint.anti_alias = false;
+        let start = x.round();
+        let by = baseline.round();
+        let mut pen = start;
+        let mut prev = None;
+        for ch in text.chars() {
+            let id = face.glyph_id(ch);
+            if let Some(p) = prev {
+                pen += sf.kern(p, id).round();
+            }
+            let g = crate::fonts::mono_glyph(&font, ch);
+            if let Some(path) = &g.path {
+                self.pm.fill_path(path, &paint, FillRule::Winding, Transform::from_translate(pen, by), None);
+            }
+            pen += g.advance;
+            prev = Some(id);
+        }
+        pen - start
     }
 
     /// Draws text aligned inside `rect` (one line, no clipping, like QPainter::drawText).
