@@ -740,42 +740,6 @@ fn work_juggle() -> Scene {
     a
 }
 
-fn work_progress() -> Scene {
-    let mut a = Scene::default();
-    let n = 12;
-    let cloud = c(0xe8ecf4);
-    for f in 0..n {
-        let mut g = Grid::new(c(0x121826));
-        g.rect(0, 31, GW, 1, c(0x222a3c));
-        let done = f >= 9;
-        let p = Pose {
-            eyes: if done { Eyes::Happy } else { Eyes::Up },
-            look_x: 1,
-            arm_l: if done { L_UP } else { L_DOWN },
-            arm_r: if done { R_UP } else { limb(16, 7, 2, 2) },
-            mouth: if done { Mouth::Smile } else { Mouth::None },
-            ..Pose::default()
-        };
-        critter(&mut g, 3, 16 + if done && f % 2 != 0 { -1 } else { 0 }, &p);
-        // thought bubble
-        g.px(21, 15, cloud);
-        g.rect(23, 12, 2, 2, cloud);
-        let puffs = [(25.0, 6.5, 4.0), (31.0, 5.0, 4.5), (36.0, 7.0, 3.6), (29.5, 8.0, 4.0)];
-        for (x, y, r) in puffs {
-            g.disc(x, y, r, cloud);
-        }
-        if !done {
-            g.rect(23, 5, 14, 4, c(0x3a4058));
-            let w = qround(12.0 * (f + 1) as f64 / 9.0);
-            g.rect(24, 6, w, 2, ORANGE);
-        } else {
-            g.glyph(26, 3, &["......##", ".....##.", "##..##..", ".####...", "..##...."], c(0x3cb060));
-        }
-        a.push(&g, if done { 240 } else { 150 });
-    }
-    a
-}
-
 // ------------------------------------------------------------------------------------------ alerting
 
 fn alert_wave() -> Scene {
@@ -1408,7 +1372,7 @@ const fn v(
     Variant { state, id, title, key_frame, make }
 }
 
-const VARIANTS: [Variant; 19] = {
+const VARIANTS: [Variant; 18] = {
     use ClaudeState::{Alerting as A, Chilling as C, Working as W};
     [
         v(W, "classic", "faces.scene.working.classic", 2, working),
@@ -1417,7 +1381,6 @@ const VARIANTS: [Variant; 19] = {
         v(W, "scroll", "faces.scene.working.scroll", 0, work_scroll),
         v(W, "treadmill", "faces.scene.working.treadmill", 1, work_treadmill),
         v(W, "juggle", "faces.scene.working.juggle", 1, work_juggle),
-        v(W, "progress", "faces.scene.working.progress", 5, work_progress),
         v(A, "classic", "faces.scene.alerting.classic", 2, alerting),
         v(A, "wave", "faces.scene.alerting.wave", 0, alert_wave),
         v(A, "bell", "faces.scene.alerting.bell", 2, alert_bell),
@@ -1443,7 +1406,7 @@ fn find(state: ClaudeState, variant: &str) -> &'static Variant {
 /// Variant ids of a state in table order; the first is "classic".
 pub fn variants(state: ClaudeState) -> &'static [&'static str] {
     match state {
-        ClaudeState::Working => &["classic", "hammer", "gears", "scroll", "treadmill", "juggle", "progress"],
+        ClaudeState::Working => &["classic", "hammer", "gears", "scroll", "treadmill", "juggle"],
         ClaudeState::Alerting => &["classic", "wave", "bell", "siren", "sign", "knock"],
         ClaudeState::Chilling => &["classic", "coffee", "fishing", "beach", "cloud", "bath"],
     }
@@ -1586,7 +1549,6 @@ mod tests {
             (Working, "scroll", vec![200; 12]),
             (Working, "treadmill", vec![90; 8]),
             (Working, "juggle", vec![110; 12]),
-            (Working, "progress", [vec![150; 9], vec![240; 3]].concat()),
             (Alerting, "classic", vec![170; 6]),
             (Alerting, "wave", vec![150; 8]),
             (Alerting, "bell", vec![110, 110, 160, 110, 110, 110, 160, 110]),
@@ -1604,9 +1566,9 @@ mod tests {
 
     #[test]
     fn scenes_follow_the_table() {
-        let keys = [2, 2, 1, 0, 1, 1, 5, 2, 0, 2, 1, 0, 2, 3, 2, 2, 0, 4, 2];
+        let keys = [2, 2, 1, 0, 1, 1, 2, 0, 2, 1, 0, 2, 3, 2, 2, 0, 4, 2];
         let table = table();
-        assert_eq!(table.len(), 19);
+        assert_eq!(table.len(), 18);
         for (i, (state, id, delays)) in table.into_iter().enumerate() {
             let s = generate(state, id);
             assert_eq!(s.delays, delays, "{state:?}/{id}");
@@ -1685,9 +1647,9 @@ mod tests {
             .unwrap()
             .filter(|e| e.as_ref().unwrap().path().extension().is_some_and(|x| x == "gif"))
             .count();
-        assert_eq!(gifs, 19);
+        assert_eq!(gifs, 18);
         let sheet = image::open(dir.join("sheet.png")).unwrap();
-        assert_eq!((sheet.width(), sheet.height()), (1216, 562));
+        assert_eq!((sheet.width(), sheet.height()), (1044, 562));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

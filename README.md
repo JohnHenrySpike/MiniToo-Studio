@@ -62,7 +62,7 @@ src/
   app.rs           контроллер: модель «что на экране» (§4), Claude, блокировка, ротация, трансляция, HTTP-маршруты
   api.rs           контракт ядро ↔ интерфейс: неизменяемый Snapshot + Command
   live/            живые режимы (§8) поверх общего контракта LiveMode/ModeHost
-  faces.rs, gif.rs сцены Claude (19 штук, попиксельно как в эталоне) и запись GIF
+  faces.rs, gif.rs сцены Claude (18 штук, попиксельно как в эталоне) и запись GIF
   media.rs, gallery.rs   загрузка картинок (png/jpg/gif/webp/apng/bmp/tiff/svg/jxl; avif/heic — через ImageMagick, если он есть), рендер 160×128, галерея
   canvas.rs, fonts.rs, pixelfont.rs, icons.rs   рисование кадров: DejaVu, ручной шрифт 5×7, иконки 12×12
   i18n.rs          языки (каталоги locales/*.lang, tr!/trn!), форматы даты и времени
