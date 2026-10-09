@@ -76,7 +76,6 @@ mod imp {
     use super::*;
     use ksni::menu::{CheckmarkItem, MenuItem, StandardItem};
     use ksni::TrayMethods;
-    use std::time::Duration;
     use tokio::sync::watch;
 
     struct Sni {
@@ -161,17 +160,15 @@ mod imp {
     impl Tray {
         pub fn spawn(rt: &tokio::runtime::Handle, initial: TrayState, on: Arc<dyn Fn(TrayAction) + Send + Sync>) -> Option<Tray> {
             let (tx, mut rx) = watch::channel(initial.clone());
-            let (ready_tx, ready_rx) = std::sync::mpsc::channel();
             let tray = Sni { icons: icons(initial.screen), state: initial, on };
+            // Registration finishes in the background. Waiting for it here would block the runtime
+            // worker the controller runs on, so the spawned task could not start before the wait
+            // timed out; the dropped sender then shut the freshly registered item down.
             rt.spawn(async move {
                 let handle = match tray.spawn().await {
-                    Ok(h) => {
-                        let _ = ready_tx.send(true);
-                        h
-                    }
+                    Ok(h) => h,
                     Err(e) => {
                         log::info!("трей недоступен: {e}");
-                        let _ = ready_tx.send(false);
                         return;
                     }
                 };
@@ -183,7 +180,7 @@ mod imp {
                 }
                 handle.shutdown().await;
             });
-            ready_rx.recv_timeout(Duration::from_secs(5)).unwrap_or(false).then_some(Tray { tx })
+            Some(Tray { tx })
         }
 
         pub fn update(&self, state: TrayState) {
