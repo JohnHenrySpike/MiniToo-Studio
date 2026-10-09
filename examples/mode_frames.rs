@@ -1,5 +1,5 @@
 //! Renders the live-mode screens and notification cards to PNG files for visual comparison with
-//! the Qt version: `cargo run --example mode_frames -- <out-dir>`.
+//! the Qt version: `cargo run --example mode_frames -- <out-dir> [language] [24|12]`.
 
 use chrono::{NaiveDate, NaiveDateTime};
 use minitoo::claude::{ClaudeState, Session};
@@ -24,6 +24,11 @@ fn save(dir: &Path, name: &str, f: &Frame) {
 
 fn main() {
     let out = std::env::args().nth(1).unwrap_or_else(|| "mode_frames".into());
+    // optional: language and hours (`en 12`)
+    if let Some(lang) = std::env::args().nth(2) {
+        minitoo::i18n::set_language(&lang);
+    }
+    minitoo::i18n::set_formats(&std::env::args().nth(3).unwrap_or_else(|| "auto".into()), "auto");
     let dir = Path::new(&out);
     std::fs::create_dir_all(dir).unwrap();
 

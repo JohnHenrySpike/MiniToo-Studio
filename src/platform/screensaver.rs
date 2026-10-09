@@ -48,7 +48,7 @@ mod linux {
     pub async fn watch(on: Arc<dyn Fn(bool) + Send + Sync>) -> zbus::Result<()> {
         let conn = zbus::Connection::session().await?;
         if let Some(name) = conn.unique_name() {
-            log::info!("ScreenSaver.ActiveChanged: слушаю как {name}");
+            log::info!("{}", tr!("platform.screensaver.listening", name = name));
         }
         // no path/sender in the rule: signals sent directly to our unique name match it too
         let rule = MatchRule::builder()

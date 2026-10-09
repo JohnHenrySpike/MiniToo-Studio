@@ -23,11 +23,6 @@ pub enum TrayAction {
     Quit,
 }
 
-const MENU_SHOW: &str = "Показать окно";
-const MENU_CLAUDE: &str = "Режим Claude";
-const MENU_STOP: &str = "Остановить трансляцию экрана";
-const MENU_QUIT: &str = "Выход";
-
 /// Sizes rendered for the tray; the host picks the closest one.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 const ICON_SIZES: [u32; 5] = [16, 22, 32, 48, 64];
@@ -138,18 +133,18 @@ mod imp {
                 .into()
             };
             vec![
-                item(MENU_SHOW, "window", true, TrayAction::ShowWindow),
+                item(tr!("tray.show"), "window", true, TrayAction::ShowWindow),
                 CheckmarkItem {
-                    label: MENU_CLAUDE.into(),
+                    label: tr!("tray.claude_mode").into(),
                     checked: self.state.claude_mode,
                     icon_data: include_bytes!("../../assets/claude.png").to_vec(),
                     activate: Box::new(|t: &mut Self| (t.on)(TrayAction::ToggleClaude)),
                     ..Default::default()
                 }
                 .into(),
-                item(MENU_STOP, "media-playback-stop", self.state.streaming, TrayAction::StopStream),
+                item(tr!("tray.stop_stream"), "media-playback-stop", self.state.streaming, TrayAction::StopStream),
                 MenuItem::Separator,
-                item(MENU_QUIT, "application-exit", true, TrayAction::Quit),
+                item(tr!("tray.quit"), "application-exit", true, TrayAction::Quit),
             ]
         }
     }
@@ -169,7 +164,7 @@ mod imp {
                 let handle = match tray.spawn().await {
                     Ok(h) => h,
                     Err(e) => {
-                        log::info!("трей недоступен: {e}");
+                        log::info!("{}", tr!("tray.unavailable", error = e));
                         return;
                     }
                 };
@@ -225,10 +220,10 @@ mod imp {
 
     impl Tray {
         pub fn spawn(_rt: &tokio::runtime::Handle, initial: TrayState, on: Arc<dyn Fn(TrayAction) + Send + Sync>) -> Option<Tray> {
-            let show = MenuItem::new(MENU_SHOW, true, None);
-            let claude = CheckMenuItem::new(MENU_CLAUDE, true, initial.claude_mode, None);
-            let stop = MenuItem::new(MENU_STOP, initial.streaming, None);
-            let quit = MenuItem::new(MENU_QUIT, true, None);
+            let show = MenuItem::new(tr!("tray.show"), true, None);
+            let claude = CheckMenuItem::new(tr!("tray.claude_mode"), true, initial.claude_mode, None);
+            let stop = MenuItem::new(tr!("tray.stop_stream"), initial.streaming, None);
+            let quit = MenuItem::new(tr!("tray.quit"), true, None);
             let menu = Menu::new();
             menu.append_items(&[&show, &claude, &stop, &PredefinedMenuItem::separator(), &quit]).ok()?;
             let ids = [
@@ -244,7 +239,7 @@ mod imp {
             let tray = match builder.build() {
                 Ok(t) => t,
                 Err(e) => {
-                    log::info!("трей недоступен: {e}");
+                    log::info!("{}", tr!("tray.unavailable", error = e));
                     return None;
                 }
             };

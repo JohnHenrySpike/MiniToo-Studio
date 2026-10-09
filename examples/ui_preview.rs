@@ -313,6 +313,10 @@ fn build() -> Snapshot {
             zstd_level: 19,
             close_to_tray: false,
             start_hidden: false,
+            language: "auto".into(),
+            language_used: minitoo::i18n::current().code.clone(),
+            time_format: "auto".into(),
+            date_format: "auto".into(),
         },
         image: ImageState {
             source: Some(SourceImage {
@@ -451,6 +455,18 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
         Command::SetZstdLevel(v) => s.settings.zstd_level = v,
         Command::SetCloseToTray(b) => s.settings.close_to_tray = b,
         Command::SetStartHidden(b) => s.settings.start_hidden = b,
+        Command::SetLanguage(code) => {
+            s.settings.language_used = minitoo::i18n::set_language(&code);
+            s.settings.language = code;
+        }
+        Command::SetTimeFormat(v) => {
+            s.settings.time_format = v;
+            minitoo::i18n::set_formats(&s.settings.time_format, &s.settings.date_format);
+        }
+        Command::SetDateFormat(v) => {
+            s.settings.date_format = v;
+            minitoo::i18n::set_formats(&s.settings.time_format, &s.settings.date_format);
+        }
         Command::SetFit(f) => s.image.fit = f,
         Command::SetPixelArt(b) => s.image.pixel_art = b,
         Command::SetCrop(r) => s.image.crop = r,

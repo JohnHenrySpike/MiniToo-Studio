@@ -123,20 +123,19 @@ impl Pomodoro {
 
     fn label(&self) -> &'static str {
         match self.phase {
-            PomodoroPhase::Work => "фокус",
-            PomodoroPhase::Break => "перерыв",
-            PomodoroPhase::Long => "длинный перерыв",
+            PomodoroPhase::Work => tr!("pomodoro.phase.work"),
+            PomodoroPhase::Break => tr!("pomodoro.phase.break"),
+            PomodoroPhase::Long => tr!("pomodoro.phase.long"),
         }
     }
 
     fn status(&self) -> String {
-        format!(
-            "{} {}:{:02}{}",
-            self.label(),
-            self.remaining / 60,
-            self.remaining % 60,
-            if self.running { "" } else { " (пауза)" }
-        )
+        let time = format!("{}:{:02}", self.remaining / 60, self.remaining % 60);
+        if self.running {
+            tr!("pomodoro.status", phase = self.label(), time = time)
+        } else {
+            tr!("pomodoro.status_paused", phase = self.label(), time = time)
+        }
     }
 
     fn schedule(&self, cx: &mut ModeCx) {
@@ -155,15 +154,15 @@ impl Pomodoro {
 
     fn phase_end(&self, cx: &mut ModeCx, (finished, next): PhaseEnd) {
         let rest = finished == PomodoroPhase::Work;
-        let title = if rest { "Время перерыва" } else { "Пора за работу" };
+        let title = if rest { tr!("pomodoro.card.break_title") } else { tr!("pomodoro.card.work_title") };
         let body = if rest {
             let min = if next == PomodoroPhase::Long { self.long } else { self.brk };
-            format!("Фокус завершён. Отдохните {min} мин.")
+            trn!("pomodoro.card.break_body", min)
         } else {
-            "Перерыв окончен — следующий фокус.".to_string()
+            tr!("pomodoro.card.work_body").to_string()
         };
-        cx.log(format!("Pomodoro: {title}"));
-        let time = cx.now().format("%H:%M").to_string();
+        cx.log(tr!("pomodoro.log.phase_end", title = title));
+        let time = crate::i18n::time_hm(&cx.now());
         cx.overlay(crate::notify_card::render("Pomodoro", title, &body, "chronometer", &time), 8000);
     }
 
@@ -184,7 +183,7 @@ impl Pomodoro {
         let rem = remaining.max(0);
         let time = format!("{:02}:{:02}", rem / 60, rem % 60);
         c.text(r(0.0, 38.0, 160.0, 28.0), Align::CENTER, &time, FontSpec::bold(24.0), Color::WHITE);
-        let label = if self.running { self.label().to_string() } else { format!("{} · пауза", self.label()) };
+        let label = if self.running { self.label().to_string() } else { tr!("pomodoro.label_paused", phase = self.label()) };
         c.text(r(0.0, 64.0, 160.0, 14.0), Align::CENTER, &label, FontSpec::sans(10.0), accent.lighter(1.4));
 
         // cycle dots
@@ -220,7 +219,7 @@ impl LiveMode for Pomodoro {
         "Pomodoro"
     }
     fn subtitle(&self) -> &'static str {
-        "фокус 25 мин, перерыв 5 мин"
+        tr!("pomodoro.subtitle")
     }
     fn icon(&self) -> &'static str {
         "timer"

@@ -1,0 +1,687 @@
+# MiniToo Studio — English.
+#
+# To translate MiniToo Studio, copy this file to ~/.config/minitoo-studio/locales/<code>.lang
+# (for example de.lang), change @name and the texts, then pick the language in Settings.
+# See README.md next to this file.
+
+@name = English
+@plural = en
+
+# ---------------------------------------------------------------- dates and times
+# Patterns: %Y 2026, %y 26, %m 10, %-m 10, %d 09, %-d 9, %B month, %b short month,
+# %A weekday, %a short weekday, %H %-H %I %-I hours, %M minutes, %S seconds, %p AM/PM.
+
+# 24 or 12
+format.hours = 24
+# the numeric date used when Settings say "as in the language"
+format.date = %Y-%m-%d
+date.long = %A, %B %-d
+date.short = %a, %b %-d
+# the form a month takes inside a date
+date.months = January, February, March, April, May, June, July, August, September, October, November, December
+date.months.short = Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
+date.weekdays = Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
+date.weekdays.short = Mon, Tue, Wed, Thu, Fri, Sat, Sun
+time.am = AM
+time.pm = PM
+
+# ---------------------------------------------------------------- settings page
+settings.title = Settings
+settings.subtitle = speaker connection, transfer and the app
+settings.group.look = Appearance
+settings.theme.beige = Beige
+settings.theme.night = Night
+settings.theme.hint = MiniToo body colours or a dark desk for the evening. The speaker on the right always stays beige.
+settings.group.language = Language and formats
+settings.language = Language
+settings.language.system = System ({language})
+settings.language.folder = Translations folder
+settings.language.folder_tip = Opens the folder for your own translations; en.lang.template inside is the English text to start from
+settings.language.hint = Your own translation: copy en.lang.template in {folder} to <code>.lang (for example de.lang), translate the lines after “=”, then pick the language above.
+settings.time = Time
+settings.format.auto = As in the language
+settings.time.24 = 24 hours
+settings.time.12 = 12 hours
+settings.date = Date
+settings.date.auto = As in the language ({example})
+settings.date.custom = Custom format…
+settings.date.pattern_hint = %d day, %m month, %Y year, %y two digits, %B month name, %b short, %A weekday, %a short. %-d and %-m without a leading zero.
+settings.group.device = Speaker
+settings.mac = MAC address
+settings.mac.find = Find
+settings.mac.searching = Searching…
+settings.mac.unnamed = unnamed
+settings.channel = RFCOMM channel
+settings.auto_connect = Connect on start-up
+settings.keepalive = Keep awake
+settings.keepalive.hint = seconds between service pings (0 — off). Keeps the connection alive so the speaker does not drop it.
+settings.group.transfer = Image transfer
+settings.chunk_delay = Pause between packets
+settings.chunk_delay.hint = ms. Less is faster (screen streaming especially), but the speaker may not keep up and ask for packets again.
+settings.zstd = zstd compression
+settings.zstd.hint = level for pictures and animations (19 — compact). Screen streaming always uses a fast level.
+settings.group.app = Application
+settings.close_to_tray = Minimize to tray when the window is closed
+settings.start_hidden = Start minimized to tray
+settings.cli.prefix = "Command line: "
+settings.cli.send = --send file.gif [--fit crop|fit|stretch]
+settings.cli.debug = " (log and protocol diagnostics)."
+
+# ---------------------------------------------------------------- clock and weather mode (device)
+clock.title = Clock and weather
+clock.subtitle = time, date, Open-Meteo
+clock.status.no_city = set a city for the weather
+clock.status.weather = {city}: {temp}°, {sky}, updated {time}
+clock.status.weather_error = weather: {error}
+clock.error.http = HTTP error {status}
+clock.error.reply = unexpected reply
+clock.error.timeout = timed out
+clock.error.connect = no connection
+# the date line of the "Pixels" face with 12-hour time
+clock.pixel.date_ampm = {ampm} · {date}
+clock.weather.clear = clear
+clock.weather.partly_cloudy = partly cloudy
+clock.weather.overcast = overcast
+clock.weather.fog = fog
+clock.weather.drizzle = drizzle
+clock.weather.rain = rain
+clock.weather.snow = snow
+clock.weather.showers = showers
+clock.weather.snowfall = snowfall
+clock.weather.thunderstorm = thunderstorm
+
+
+# ================================================================ window, navigation, tray, platform
+
+# ---------------------------------------------------------------- navigation (src/ui/nav.rs)
+nav.image = Image
+nav.image_sub = pictures and GIFs
+nav.screen = Screen
+nav.screen_sub = mirror an area
+nav.modes = Modes
+nav.modes_sub = clock, music, system
+nav.claude = Claude
+nav.claude_sub = agent status
+nav.device = Speaker
+nav.device_sub = sound, battery, built-in
+nav.settings = Settings
+nav.settings_sub = connection and app
+nav.on_device = On the speaker now
+nav.theme_beige = Beige theme
+nav.theme_dark = Dark theme
+
+# ---------------------------------------------------------------- title bar (src/ui/titlebar.rs)
+titlebar.close = Close
+titlebar.restore = Restore
+titlebar.maximize = Maximize
+titlebar.minimize = Minimize
+
+# ---------------------------------------------------------------- device panel (src/ui/device_panel.rs)
+panel.screen_placeholder = the speaker screen goes here
+panel.screen_off = Turn the speaker screen off
+panel.screen_on = Turn the speaker screen on
+panel.volume_down = Quieter
+panel.volume_up = Louder
+panel.prev_track = Previous track
+panel.play_pause = Play / pause
+panel.next_track = Next track
+panel.connect = Connect the speaker
+panel.disconnect = Disconnect the speaker
+panel.conn.disconnected = Not connected
+panel.conn.connecting = Connecting…
+panel.conn.connected = Connected
+panel.on_screen = On screen: {what}
+panel.on_screen_alert = On screen: {what}  •  Claude alert
+panel.brightness = Screen brightness
+panel.volume = Speaker volume
+panel.log_show = Log
+panel.log_show_count = Log  ({count})
+panel.log_hide = Hide log
+panel.log_hide_count = Hide log  ({count})
+panel.log_clear = Clear log
+
+# ---------------------------------------------------------------- file dialogs (src/ui/pages/mod.rs)
+ui.files.images = Images
+ui.files.all = All files
+
+# ---------------------------------------------------------------- tray (src/platform/tray.rs)
+tray.show = Show window
+tray.claude_mode = Claude mode
+tray.stop_stream = Stop screen mirroring
+tray.quit = Quit
+tray.unavailable = tray unavailable: {error}
+
+# ---------------------------------------------------------------- notifications (src/platform/notifications.rs)
+notify.unsupported = notification monitoring is not available on this platform
+notify.no_session_bus = D-Bus session bus unavailable: {error}
+notify.auth_failed = D-Bus authentication: {error}
+notify.bus_error = D-Bus: {error}
+notify.interrupted = notification monitoring interrupted: {error}
+notify.monitor_failed = BecomeMonitor failed: {error}
+notify.bad_message = corrupt message
+notify.no_bus_address = DBUS_SESSION_BUS_ADDRESS is not set
+
+# ---------------------------------------------------------------- BlueZ (src/platform/bluez.rs)
+bluez.unsupported = not available on this platform
+bluez.bus_timeout = D-Bus system bus is not responding
+bluez.bus_unavailable = D-Bus system bus unavailable: {error}
+bluez.not_running = the BlueZ service is not running
+bluez.call_timeout = {call}: no reply in {secs} s
+bluez.bad_reply = could not parse the BlueZ reply: {error}
+bluez.device_not_found = speaker {mac} not found in BlueZ (pair it first)
+bluez.connect_failed = could not connect: {error}
+bluez.no_adapter = no Bluetooth adapter found
+bluez.powered_off = Bluetooth is off
+bluez.discovery_failed = discovery did not start: {error}
+
+# ---------------------------------------------------------------- screen capture (src/platform/capture.rs)
+capture.cancelled = source selection cancelled
+capture.portal_error = the portal returned an error
+capture.portal_unavailable = xdg-desktop-portal ScreenCast unavailable: {error}
+capture.no_stream = the portal returned no stream
+capture.session_closed = capture session closed
+capture.pw_start_failed = could not start the PipeWire stream
+capture.pw_connect_failed = could not connect to PipeWire
+capture.pw_closed = PipeWire stream closed
+capture.pw_format = PipeWire: format
+capture.start_failed = could not start screen capture
+capture.no_monitors = no monitors
+capture.unavailable = screen capture unavailable: {error}
+capture.failed = screen capture failed: {error}
+capture.systemctl_code = systemctl: exit code {code}
+capture.restart_unsupported = not available
+
+# ---------------------------------------------------------------- screensaver (src/platform/screensaver.rs)
+platform.screensaver.listening = ScreenSaver.ActiveChanged: listening as {name}
+
+
+# ================================================================ Image, Screen and Speaker pages
+
+# ---------------------------------------------------------------- src/ui/pages/device.rs
+device_page.title = Speaker
+device_page.subtitle = what MiniToo can do and what it reports
+device_page.subtitle_disconnected = speaker not connected — commands will be sent once it connects
+device_page.send = Send
+device_page.battery.plate = battery
+device_page.battery.hint_known = Reported by the Hands-Free profile via BlueZ. Updated every 30 seconds.
+device_page.battery.hint_unknown = The speaker doesn't report its charge over the app protocol. The Hands-Free profile does, when the speaker is connected to the computer as an audio device.
+device_page.battery.connect_audio = Connect as audio
+device_page.battery.connect_audio_tip = The speaker becomes the computer's audio output (A2DP / Hands-Free)
+device_page.screen.plate = screen
+device_page.screen.off = Turn off
+device_page.screen.on = Turn on
+device_page.screen.sync_clock = Sync clock
+device_page.screen.sync_clock_tip = Set the computer's time on the speaker (for its built-in clock)
+device_page.screen.brightness_hint = Brightness — with the slider under the speaker on the right.
+device_page.sound.plate = sound
+device_page.sound.prev = Previous track
+device_page.sound.pause = Pause
+device_page.sound.play = Play
+device_page.sound.next = Next track
+device_page.sound.player_note = the player on the device playing through the speaker
+device_page.sound.hint_audio = The buttons work like the keys on the speaker: they send “play / pause / track” to the computer's player. If no player is running, nothing happens.
+device_page.sound.hint_no_audio = The speaker isn't connected as audio right now, so the player buttons have nowhere to send commands.
+device_page.lock.title = When the computer screen is locked
+device_page.lock.show_clock = Show the clock and dim the brightness
+device_page.lock.brightness = Brightness:
+device_page.lock.hint = The mode doesn't change: after unlocking, the speaker returns to its previous picture and brightness. Claude alerts and notifications still show over the clock.
+device_page.lock.hint_locked = The screen is locked now. The mode doesn't change: after unlocking, the speaker returns to its previous picture and brightness. Claude alerts and notifications still show over the clock.
+device_page.builtin.title = Speaker's built-in screens
+device_page.builtin.cosmonaut = Cosmonaut
+device_page.builtin.gallery = Gallery
+device_page.builtin.noise_meter = Noise meter
+device_page.builtin.tetris = Tetris
+device_page.builtin.game2 = Game 2
+device_page.builtin.game3 = Game 3
+device_page.builtin.exit_game = Exit game
+device_page.builtin.scoreboard = Scoreboard:
+device_page.builtin.blue = blue
+device_page.builtin.red = red
+device_page.builtin.show = Show
+device_page.builtin.hint = To leave a built-in screen, press the button on the speaker itself or send anything from the app.
+device_page.notice.title = Notification on the speaker
+device_page.notice.default_text = Hello!
+device_page.notice.icon = Icon
+device_page.notice.icon_tip = The speaker's built-in notification: only the selected app's icon
+device_page.notice.text_hint = Notification text
+device_page.notice.hint = The speaker's built-in notification can only show an icon; the firmware doesn't display text. So “Send” draws a card with the text in the app and keeps it on screen for {secs} s, like desktop notifications.
+device_page.info.title = What the speaker reports
+device_page.info.heartbeat = Speaker heartbeat
+device_page.diag.title = Diagnostics
+device_page.diag.hex_hint = hex: <command> <arguments>, e.g. 09
+device_page.diag.hint = Replies go to the log on the right and to http://127.0.0.1:{port}/device. Don't send the sleep commands 0x40, 0xa3, 0xa4, 0xad, 0xae — they hang the speaker until it is powered off.
+
+# ---------------------------------------------------------------- src/ui/pages/image.rs
+image.title = Image
+image.open = Open…
+image.subtitle_empty = a picture or GIF on the whole speaker screen
+image.frames[one] = {n} frame
+image.frames[other] = {n} frames
+image.open_dialog_title = Choose an image
+image.folder_dialog_title = Picture folder
+image.drop_here = Drop a picture or GIF here
+image.choose_file = Choose file…
+image.send = Send to speaker
+image.thumb.sent = sent: {count}
+image.thumb.click_hint = click to open, double-click to send
+image.thumb.favorite = Add to favorites
+image.thumb.unfavorite = Remove from favorites
+image.thumb.remove = Remove from gallery
+image.thumb.open_editor = Open in editor
+image.gallery.title = Gallery
+image.gallery.all = All  {count}
+image.gallery.all_tip = Everything you have opened and sent
+image.gallery.favorites = Favorites
+image.gallery.favorites_count = Favorites  {count}
+image.gallery.folder = Folder…
+image.gallery.folder_tip = Show pictures from your own folder
+image.gallery.collapse = Collapse to a strip
+image.gallery.expand = Expand to a grid
+image.gallery.remove_folder = Remove folder
+image.gallery.other_folder = Choose another folder…
+image.gallery.rescan = Rescan folder
+image.gallery.choose_folder = Choose folder…
+image.gallery.empty_favorites = Star pictures and they will gather here.
+image.gallery.no_folder = No folder chosen.
+image.gallery.folder_empty = No pictures in the folder.
+image.gallery.empty_all = Pictures you open and send will appear here. You can drop files or a whole folder here.
+image.warn_92 = The speaker shows up to 92 frames — extra frames will be evenly dropped, the duration is kept.
+image.preview_title = On the speaker
+image.fit.crop = Crop
+image.fit.fit = Fit
+image.fit.stretch = Stretch
+image.fit.crop_hint = Drag the frame and its corners, mouse wheel to zoom, double-click to reset. Screen ratio 5:4.
+image.fit.fit_hint = The whole picture, margins filled with black.
+image.fit.stretch_hint = The picture is stretched to the whole screen, ignoring proportions.
+image.pixel_art = Pixel art
+image.pixel_art_tip = Scale without smoothing — for pixel graphics
+image.reset_crop = Reset frame
+
+# ---------------------------------------------------------------- src/ui/pages/screen.rs
+screen.title = Screen
+screen.subtitle = stream an area of the screen or a window
+screen.subtitle_source = source {width}×{height} — select an area with the frame
+screen.other_source = Other source…
+screen.other_source_tip = Show the screen or window picker again
+screen.stop_capture = Stop capture
+screen.waiting = Waiting for choice…
+screen.start_capture = Start capture
+screen.choose_screen = Choose screen…
+screen.stale.title = Screen capture portal is outdated
+screen.stale.message = After a system update the portal service still runs with old libraries, and the screen picker doesn't open. It needs a restart ({units}).
+screen.stale.restart = Restart
+screen.canvas.selecting_title = Choose a screen or window…
+screen.canvas.idle_title = Capture not started
+screen.canvas.selecting_text = KDE is showing the picker — it may open behind this window.
+screen.canvas.idle_text = Press “{start}”. KDE will ask which screen or window to show; the choice is remembered. Then select an area with the frame and press “{stream}”.
+screen.canvas.error = Capture error: {error}
+screen.stream = Stream
+screen.stop = Stop
+screen.fps = Frame rate
+screen.fps_value = {v} fps
+screen.crisp = Crisp pixels
+screen.crisp_tip = No smoothing when scaling down — for pixel art and small text
+screen.quality.label = Quality
+screen.quality.max = Best
+screen.quality.balance = Balanced
+screen.quality.speed = Fast
+screen.quality.tip = “Balanced” and “Fast” reduce color to RGB565/RGB444 — smaller frames arrive faster. An unchanged screen isn't sent again.
+screen.actual_fps = Actual {fps} fps
+screen.actual_fps_frame = Actual {fps} fps,  frame {kb} KB
+screen.paused = Paused: a Claude alert or a notification is on the speaker
+
+
+# ================================================================ Modes and Claude pages
+
+# ---------------------------------------------------------------- src/ui/pages/modes.rs
+modes.page.title = Modes
+modes.page.subtitle = screens that draw themselves and keep the device up to date
+modes.page.stop = Stop
+modes.page.stop_tip = Stop updating the device (the picture stays)
+modes.rotation.title = Rotation
+modes.rotation.interval_value = {v} s
+modes.rotation.interval_tip = How many seconds to show each mode
+modes.rotation.running = Rotation on
+modes.rotation.start = Start rotation
+modes.rotation.stop_tip = Stop rotation — the current mode stays on the device
+modes.rotation.start_tip = Show the checked modes in turn
+modes.rotation.next_tip = Next mode now
+modes.rotation.hint_none = Check the modes that should take turns on the device.
+modes.rotation.hint_one = One mode is checked — it will just be shown. Check more to make them take turns.
+modes.rotation.hint_checked[one] = {n} mode checked. They go in list order.
+modes.rotation.hint_checked[other] = {n} modes checked. They go in list order.
+modes.rotation.hint_one_running = One mode is checked — shown without switching.
+modes.rotation.hint_paused = Paused: a notification or a Claude alert is shown on top.
+modes.rotation.hint_next = Next: “{title}” in {time}
+modes.row.live_tip = On the device now
+modes.row.rotation_remove = In rotation — remove
+modes.row.rotation_add = Add to rotation
+modes.list.overlays = ON TOP OF MODES
+modes.notify.title = Notifications
+modes.notify.status_on = on, {sec} s
+modes.notify.status_off = off
+modes.card.on_device_rotating = On the device, rotating
+modes.card.on_device = Shown on the device
+modes.card.show_only = Show only this mode
+modes.card.show = Show on the device
+modes.card.hint_rotating = Rotation is on: picking one mode stops it.
+modes.card.hint_on_device_rotation = The device gets a new frame only when the picture changes. Rotation comes back after the app restarts.
+modes.card.hint_on_device_mode = The device gets a new frame only when the picture changes. The mode comes back after the app restarts.
+modes.card.hint_preview = Live preview: this is how the mode will look on the device.
+modes.clock.face = Face
+modes.clock.face_sky = Sky
+modes.clock.face_neon = Neon
+modes.clock.face_pixels = Pixels
+modes.clock.no_city = No city chosen
+modes.clock.remove_weather = Remove weather
+modes.clock.search_other = Another city…
+modes.clock.search_hint = Start typing a city name…
+modes.clock.nothing_found = Nothing found. Try in English or Russian.
+modes.clock.weather_hint = Weather by Open-Meteo, no sign-up; updated every 15 minutes.
+modes.player.none = No player is running. Any with MPRIS support will do: a browser, Spotify, Elisa, VLC…
+modes.player.pause = Pause
+modes.player.play = Play
+modes.pomodoro.pause = Pause
+modes.pomodoro.start = Start
+modes.pomodoro.skip = Skip
+modes.pomodoro.reset = Reset
+modes.pomodoro.work_min = Focus, min
+modes.pomodoro.break_min = Break, min
+modes.pomodoro.long_min = Long break, min
+modes.pomodoro.hint = A long break comes after every fourth pomodoro. When a phase ends, a card appears on the device for a few seconds, even if another mode is shown.
+modes.github.remove = Remove
+modes.github.add = Add
+modes.github.repo_hint = owner/repo or a GitHub link
+modes.github.examples = For example:
+modes.github.token_save = Save
+modes.github.token_delete = Delete
+modes.github.token_saved_hint = token saved — enter a new one to replace it
+modes.github.token_hint = GitHub token (needed for private repositories)
+modes.github.hint = Shows the latest Actions run in each repository. Without a token GitHub allows 60 requests an hour, so it polls every {mins} min; with a token, every minute.
+modes.visualizer.style_peaks = With peaks
+modes.visualizer.style_mirrored = Mirrored
+modes.visualizer.hint = The spectrum of what the computer is playing (the PipeWire output monitor). This is a frame stream: while the mode is on the device, it gets 5–8 frames a second.
+modes.notify.enable = Show KDE notifications on the device
+modes.notify.duration = Show for, seconds
+modes.notify.ignore = Don't show from
+modes.notify.ignore_hint = apps, comma-separated
+modes.notify.test = Show a test one
+modes.notify.hint = A card on top of any mode, image or stream; then the device goes back to what it was showing.
+modes.notify.group = Desktop notifications
+modes.settings.group = Settings
+modes.sysmon.hint = CPU and GPU load, temperatures, memory. Data: /proc, hwmon sensors, nvidia-smi or AMD sysfs. One frame every 2 seconds.
+modes.claudestats.hint = Counted from Claude Code logs in ~/.claude/projects for today: requests, replies and tokens.
+
+# ---------------------------------------------------------------- src/ui/pages/claude.rs
+claude_page.page.subtitle = Claude Code status on the device screen
+claude_page.page.show_on_device = Show on the device
+claude_page.ago.seconds = {n} s ago
+claude_page.ago.minutes = {n} min ago
+claude_page.ago.hours = {n} h ago
+claude_page.status.plate = status
+claude_page.status.no_sessions = No active sessions
+claude_page.status.sessions[one] = {n} session
+claude_page.status.sessions[other] = {n} sessions
+claude_page.status.interrupt = Alert on top of images and streams
+claude_page.status.idle_alerts = “Waiting for input” after idling is an alert too
+claude_page.status.alert_caption = Project and question on the “Needs you” scene
+claude_page.status.alert_caption_tip = For example: “divoom — Allow Bash?”. If several sessions are waiting, “+N” appears next to the project.
+claude_page.face.custom_file = own file: {file}
+claude_page.face.scene = scene “{title}”
+claude_page.face.show_tip = Show on the device
+claude_page.face.custom_gif = Own GIF…
+claude_page.face.reset_tip = Restore the built-in scenes
+claude_page.face.pick_title = GIF or image for the status
+claude_page.face.scene_tip = “{title}” — click to show on the device
+claude_page.face.set_remove = In the set — remove
+claude_page.face.set_add = Add to the set
+claude_page.faces.group = State animations
+claude_page.faces.hint = On every state change a random scene from the checked ones is shown; if the state stays the same for long, the next one comes after the set time (except “Needs you”). An own GIF replaces all scenes of the state.
+claude_page.faces.every = Change scene every
+claude_page.faces.every_off = never
+claude_page.faces.every_value = {v} min
+claude_page.sessions.group = Sessions
+claude_page.sessions.empty = No active sessions. Start Claude Code and sessions will appear here.
+claude_page.sessions.no_hooks = Install the hooks below so that Claude Code reports its status.
+claude_page.sessions.test = Test:
+claude_page.sessions.test_tip = For 10 seconds the device shows the scene in any mode, then goes back to what it was showing
+claude_page.sessions.clear = Clear
+claude_page.hooks.group = Connection to Claude Code
+claude_page.hooks.server = Event server
+claude_page.hooks.listening = listening; reinstall the hooks after changing the port
+claude_page.hooks.port_busy = port in use — choose another
+claude_page.hooks.hooks = Hooks
+claude_page.hooks.installed_in = installed in {path}
+claude_page.hooks.not_installed = not installed
+claude_page.hooks.hint = The button adds the SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop and SessionEnd hooks to {path} (backing up the file first). Each hook is a short curl to the local port; if the app is not running, it exits quietly and Claude does not notice.
+claude_page.hooks.install = Install hooks
+claude_page.hooks.uninstall = Remove hooks
+claude_page.hooks.copy_json = Copy JSON
+claude_page.hooks.copied = JSON copied to the clipboard
+
+
+# ================================================================ live modes (device screens)
+
+# ---------------------------------------------------------------- src/live/github.rs
+github.err.format = enter owner/repo or a repository link
+github.err.duplicate = already in the list
+github.err.full = the screen fits 4 repositories
+github.state.passed = passed
+github.state.failed = failed
+github.state.running = running
+github.state.loading = loading…
+github.no_runs = no runs
+github.err.not_found = not found or private
+github.err.rate_limit = GitHub API limit
+github.err.offline = no network
+github.err.http = error {code}
+github.status.empty = add owner/repo repositories
+github.screen.empty1 = add repositories
+github.screen.empty2 = in the app
+github.row.loading = loading
+github.row.passed = passed
+github.row.failed = failed
+github.row.running = running
+github.status.failing = failing: {failing} of {total}
+github.status.every_minutes[one] = {n} repo, updated every {min} min
+github.status.every_minutes[other] = {n} repos, updated every {min} min
+github.status.every_minute[one] = {n} repo, updated every minute
+github.status.every_minute[other] = {n} repos, updated every minute
+github.subtitle = latest CI runs per repository
+# ---------------------------------------------------------------- src/live/visualizer.rs
+visualizer.silence = silence…
+visualizer.title = Audio visualizer
+visualizer.subtitle = spectrum of what plays on the computer
+visualizer.listening = listening to system audio
+visualizer.err.no_pipewire = no connection to PipeWire
+visualizer.err.capture = audio capture error: {error}
+visualizer.err.pw_format = PipeWire: format
+visualizer.err.no_output = no audio output device
+visualizer.err.no_input = no audio input device
+visualizer.err.unsupported_format = unsupported audio format: {format}
+# ---------------------------------------------------------------- src/live/pomodoro.rs
+pomodoro.phase.work = focus
+pomodoro.phase.break = break
+pomodoro.phase.long = long break
+pomodoro.status = {phase} {time}
+pomodoro.status_paused = {phase} {time} (paused)
+pomodoro.card.break_title = Break time
+pomodoro.card.work_title = Back to work
+pomodoro.card.break_body[one] = Focus done. Take a {n}-minute break.
+pomodoro.card.break_body[other] = Focus done. Take a {n}-minute break.
+pomodoro.card.work_body = Break is over — next focus.
+pomodoro.log.phase_end = Pomodoro: {title}
+pomodoro.label_paused = {phase} · paused
+pomodoro.subtitle = focus 25 min, break 5 min
+# ---------------------------------------------------------------- src/live/claudestats.rs
+claudestats.summary = today: {total} tokens (input {input}, output {output}, cache {cache}), replies: {replies}, prompts: {prompts}
+claudestats.no_sessions = no active sessions
+claudestats.more = and {count} more
+claudestats.today = today
+claudestats.tokens_short = {total} tok.
+claudestats.replies = replies {count}
+claudestats.output = output {output}
+claudestats.title = Claude statistics
+claudestats.subtitle = sessions and tokens today
+# ---------------------------------------------------------------- src/live/nowplaying.rs
+nowplaying.no_player = no player is running
+nowplaying.nothing_playing = Nothing playing
+nowplaying.title = Now playing
+nowplaying.subtitle = cover and track from any player (MPRIS)
+nowplaying.err.unsupported = MPRIS is not available on this platform
+nowplaying.err.no_session_bus = no D-Bus session bus: {error}
+nowplaying.err.dbus_timeout = D-Bus is not responding
+# ---------------------------------------------------------------- src/live/sysmon.rs
+sysmon.header = System
+sysmon.status = CPU {cpu}%  ·  RAM {ram} GB
+sysmon.title = System monitor
+sysmon.subtitle = CPU, GPU, memory, temperatures
+
+
+# ================================================================ Claude scenes and notification card
+
+# ---------------------------------------------------------------- src/claude.rs
+claude.state.working = Working
+claude.state.alerting = Needs you
+claude.state.chilling = Resting
+claude.state.working_lower = working
+claude.state.alerting_lower = needs you
+claude.state.chilling_lower = resting
+claude.manual_project = test
+claude.caption.allow_tool = Allow {tool}?
+claude.caption.waiting_input = Needs input
+claude.caption.attention = Needs attention
+claude.caption.waiting = Needs you
+claude.hooks.bad_json = {file} contains invalid JSON — hooks not installed
+claude.hooks.backup_failed = Could not make a backup copy
+claude.hooks.installed = Hooks installed. New Claude Code sessions will start sending their status.
+claude.hooks.file_not_found = File {file} not found
+claude.hooks.removed = Hooks removed.
+# ---------------------------------------------------------------- src/faces.rs
+faces.scene.working.classic = Laptop
+faces.scene.working.hammer = Blacksmith
+faces.scene.working.gears = Gears
+faces.scene.working.scroll = Scroll
+faces.scene.working.treadmill = Jogging
+faces.scene.working.juggle = Juggler
+faces.scene.working.progress = Progress
+faces.scene.alerting.classic = Alarm!
+faces.scene.alerting.wave = Waving arms
+faces.scene.alerting.bell = Bell
+faces.scene.alerting.siren = Beacon
+faces.scene.alerting.sign = Sign "?"
+faces.scene.alerting.knock = Knock-knock
+faces.scene.chilling.classic = Moonlit nap
+faces.scene.chilling.coffee = Coffee
+faces.scene.chilling.fishing = Fishing
+faces.scene.chilling.beach = Beach
+faces.scene.chilling.cloud = Cloud
+faces.scene.chilling.bath = Bath
+faces.sheet.heading = MiniToo Studio — Claude status animations (sample frame, 160×128)
+faces.sheet.label[one] = {state} / {id} · {n} frame
+faces.sheet.label[other] = {state} / {id} · {n} frames
+faces.sheet.default = current
+# ---------------------------------------------------------------- src/notify_card.rs
+card.meta = {app} · {time}
+
+
+# ================================================================ core: log, tray tooltip, command line
+
+# ---------------------------------------------------------------- src/main.rs
+cli.help = MiniToo Studio — Divoom MiniToo speaker screen\n\n  minitoo-studio                      window + tray\n  minitoo-studio --hidden             start in the tray\n  minitoo-studio --headless           no window or tray (speaker and HTTP API only)\n  minitoo-studio --send f.gif [--fit crop|fit|stretch]   via the running app, otherwise directly\n  minitoo-studio --mode claude|idle   switch the running app\n  minitoo-studio --state working|alerting|chilling\n  minitoo-studio --status             JSON /status\n  minitoo-studio --no-device          don't connect at startup\n  minitoo-studio --image f.png        open an image at startup\n  minitoo-studio --debug              log in the right panel, protocol diagnostics, “pulse”\n  minitoo-studio --screenshot DIR     (debug) screenshots of all pages in both themes, no speaker\n
+cli.needs_value = {name}: value required
+cli.unknown_arg = unknown argument: {arg}
+cli.scenes_written = scenes written to {dir}
+cli.not_running = MiniToo Studio is not running (port {port})
+cli.not_sent = not sent
+cli.timeout = timeout: the speaker did not respond within 60 s
+
+# ---------------------------------------------------------------- src/worker.rs
+worker.command_forbidden = command {cmd} not sent: it hangs the speaker
+worker.send_error = send error: {error}
+worker.encode_failed = could not encode the image
+worker.no_request = the speaker did not request data, sending anyway
+worker.resent = the speaker re-requested {resent} of {total} packets
+worker.disconnected = disconnected
+worker.no_link = can't reach the speaker: {error} (retry in {secs} s)
+worker.connected = connected
+worker.link_lost = connection lost, reconnecting
+
+# ---------------------------------------------------------------- src/media.rs
+media.unreadable = could not read the image
+media.unsupported = format not supported
+media.svg_size = SVG: size
+
+# ---------------------------------------------------------------- src/transport.rs
+transport.bad_mac = invalid MAC address "{address}"
+transport.error_code = error {code}
+transport.connect_timeout = connection timeout
+transport.link_broken = connection broken
+transport.closed_by_device = the speaker closed the connection
+transport.socket_error = socket error {code}
+transport.no_connection_wsa = no connection (WSA {code})
+transport.use_serial_path = on this platform, give the speaker's serial port path instead of a MAC (e.g. /dev/cu.DivoomMiniToo-App)
+transport.port_closed = port closed
+
+# ---------------------------------------------------------------- src/app.rs
+log.connecting = connecting to {mac}…
+log.http_port_busy = HTTP server: port {port} is in use ({error})
+log.http_listening = HTTP server: 127.0.0.1:{port}
+log.notifications_error = notifications: {error}
+log.audio_connected = audio connected
+log.audio_error = audio: {error}
+log.discovery_error = scan: {error}
+app.portal_restart_failed = could not restart the portal: {error}
+app.transfer.live = {title}: {kb} KB, {ms} ms
+app.transfer.stream = streaming: {kb} KB/frame, {ms} ms
+app.transfer.media[one] = {kb} KB, {n} frame, {ms} ms
+app.transfer.media[other] = {kb} KB, {n} frames, {ms} ms
+log.sent = sent: {transfer}
+log.mode = mode: {title}
+log.rotation[one] = rotation: {n} mode, every {secs} s
+log.rotation[other] = rotation: {n} modes, every {secs} s
+app.open_failed = could not open {file}: {error}
+app.open_failed_file = could not open {file}
+log.screen_locked = screen locked: clock, brightness {percent}%
+log.screen_unlocked = screen unlocked
+log.notification = notification: {app} — {text}
+log.battery = speaker battery: {percent}%
+log.sending[one] = sending {name} ({n} frame)
+log.sending[other] = sending {name} ({n} frames)
+log.gallery_added = added to the gallery: {count}
+log.time_synced = speaker time synced
+log.bad_hex = invalid hex: {text}
+log.bluez_not_found = speaker not found in BlueZ
+log.connecting_audio = connecting the speaker as an audio device (for battery data)…
+app.test_notification.summary = Anna
+app.test_notification.body = Moving the call to 8:30 pm, ok?
+log.hooks_installed = Claude Code hooks installed
+log.hooks_removed = Claude Code hooks removed
+app.tray.connected = connected
+app.tray.connecting = connecting…
+app.tray.disconnected = not connected
+app.tray.tooltip = MiniToo Studio\nSpeaker: {device}\nMode: {mode}\nClaude: {state}
+app.mode.idle = idle
+app.mode.image = image
+app.mode.screen = screen sharing
+app.mode.claude = Claude status
+app.mode.live = live mode
+app.on_screen.idle = nothing (idle)
+app.reported.source_mode = mode {n}
+app.reported.sd_none = none
+app.reported.sd_present = inserted
+app.reported.off = off
+app.reported.minutes = {n} min
+app.reported.hours12 = 12-hour
+app.reported.hours24 = 24-hour
+app.reported.no = no
+app.reported.yes = yes
+app.reported.sound_number = #{n}
+app.reported.volume = Volume
+app.reported.brightness = Brightness
+app.reported.source = Audio source
+app.reported.sd_card = SD card
+app.reported.auto_off = Auto power-off
+app.reported.time_format = Time format
+app.reported.auto_connect = Auto-connect
+app.reported.notify_sound = Notification sound

@@ -111,8 +111,8 @@ impl SystemMonitor {
     pub fn frame(&self, now: chrono::NaiveDateTime) -> Frame {
         let mut c = Canvas::device();
         c.fill(Color::hex(0x0a0e16));
-        c.text(r(8.0, 2.0, 100.0, 18.0), Align::LEFT, "Система", FontSpec::bold(12.0), Color::WHITE);
-        c.text(r(100.0, 2.0, 52.0, 18.0), Align::RIGHT, &now.format("%H:%M").to_string(), FontSpec::sans(10.0), Color::hex(0x96a0b4));
+        c.text(r(8.0, 2.0, 100.0, 18.0), Align::LEFT, tr!("sysmon.header"), FontSpec::bold(12.0), Color::WHITE);
+        c.text(r(100.0, 2.0, 52.0, 18.0), Align::RIGHT, &crate::i18n::time_hm(&now), FontSpec::sans(10.0), Color::hex(0x96a0b4));
 
         let temp = |t: Option<f64>| t.filter(|t| *t >= 0.0).map(|t| format!("  {}°", t.round() as i64)).unwrap_or_default();
         let mut rows: Vec<(&str, String, f64, Color)> =
@@ -156,7 +156,7 @@ impl SystemMonitor {
     }
 
     fn status(&self) -> String {
-        format!("CPU {}%  ·  RAM {} ГБ", self.cpu.round() as i64, gb(self.mem_used))
+        tr!("sysmon.status", cpu = self.cpu.round() as i64, ram = gb(self.mem_used))
     }
 }
 
@@ -181,10 +181,10 @@ impl LiveMode for SystemMonitor {
         "sysmon"
     }
     fn title(&self) -> &'static str {
-        "Системный монитор"
+        tr!("sysmon.title")
     }
     fn subtitle(&self) -> &'static str {
-        "CPU, GPU, память, температуры"
+        tr!("sysmon.subtitle")
     }
     fn icon(&self) -> &'static str {
         "sysmon"

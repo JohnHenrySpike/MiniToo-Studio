@@ -6,7 +6,7 @@ use crate::fonts::FontSpec;
 use crate::frame::Frame;
 
 /// Card for `app` / `summary` / `body` with the icon looked up by `icon` (theme name or path),
-/// then `app.to_lowercase()`, then `preferences-desktop-notification`. `time` is «HH:mm».
+/// then `app.to_lowercase()`, then `preferences-desktop-notification`. `time` is the time already formatted for display («20:48»).
 pub fn render(app: &str, summary: &str, body: &str, icon: &str, time: &str) -> Frame {
     let mut c = Canvas::device();
     c.fill(Color::hex(0x10121a));
@@ -21,7 +21,7 @@ pub fn render(app: &str, summary: &str, body: &str, icon: &str, time: &str) -> F
     let title = if summary.is_empty() { app } else { summary };
     c.text(r(48.0, 12.0, 102.0, 18.0), Align::LEFT, &Canvas::elide(title, title_font, 102.0), title_font, Color::WHITE);
     let meta_font = FontSpec::sans(9.0);
-    let meta = Canvas::elide(&format!("{app} · {time}"), meta_font, 102.0);
+    let meta = Canvas::elide(&tr!("card.meta", app = app, time = time), meta_font, 102.0);
     c.text(r(48.0, 29.0, 102.0, 14.0), Align::LEFT, &meta, meta_font, Color::hex(0x96a0b9));
 
     let body_font = FontSpec::sans(11.0);

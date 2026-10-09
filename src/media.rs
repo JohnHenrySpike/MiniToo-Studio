@@ -44,7 +44,7 @@ impl Animation {
 
     fn finish(mut self) -> Result<Animation, String> {
         if self.frames.is_empty() {
-            return Err("не удалось прочитать изображение".into());
+            return Err(tr!("media.unreadable").into());
         }
         if self.width == 0 {
             self.width = self.frames[0].width();
@@ -121,7 +121,7 @@ pub fn load_bytes(bytes: &[u8], path: &Path, max_frames: usize) -> Result<Animat
 fn load_raster(bytes: &[u8], max_frames: usize) -> Result<Animation, String> {
     use image::ImageFormat;
     let cursor = || std::io::Cursor::new(bytes);
-    let format = image::guess_format(bytes).map_err(|_| "формат не поддерживается".to_string())?;
+    let format = image::guess_format(bytes).map_err(|_| tr!("media.unsupported").to_string())?;
     match format {
         ImageFormat::Gif => {
             let d = image::codecs::gif::GifDecoder::new(cursor()).map_err(|e| e.to_string())?;
@@ -169,7 +169,7 @@ fn load_svg(bytes: &[u8]) -> Result<Animation, String> {
     );
     let w = (size.width() * scale).round().max(1.0) as u32;
     let h = (size.height() * scale).round().max(1.0) as u32;
-    let mut pm = tiny_skia::Pixmap::new(w, h).ok_or("SVG: размер")?;
+    let mut pm = tiny_skia::Pixmap::new(w, h).ok_or(tr!("media.svg_size"))?;
     resvg::render(&tree, tiny_skia::Transform::from_scale(scale, scale), &mut pm.as_mut());
     let rgba = RgbaImage::from_raw(w, h, pm.take_demultiplied()).ok_or("SVG")?;
     Ok(Animation { width: w, height: h, frames: vec![Arc::new(rgba)], delays: vec![1000] })
@@ -223,7 +223,7 @@ fn load_external(path: &Path) -> Result<Animation, String> {
             return Ok(single(img));
         }
     }
-    Err("формат не поддерживается".into())
+    Err(tr!("media.unsupported").into())
 }
 
 /// Size and frame count without decoding everything (for gallery entries added by drop).

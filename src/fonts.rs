@@ -77,9 +77,14 @@ impl FontSpec {
     }
 }
 
-/// A glyph hinted for monochrome rendering: TrueType instructions at FreeType's mono target,
-/// the way Qt draws `QFont::NoAntialias` text. Stems land on whole pixels instead of being cut
-/// out of an anti-aliased outline by a threshold.
+/// A glyph hinted for monochrome rendering. Stems land on whole pixels instead of being cut out
+/// of an anti-aliased outline by a threshold.
+///
+/// The automatic hinter (FreeType's autohinter at the mono target) is used: it gives every
+/// letter the same stem widths and aligned heights, so small bold text reads evenly. DejaVu's
+/// own TrueType instructions (what Qt's `QFont::NoAntialias` shows) leave stems of one or two
+/// pixels within a word. Letters with a diaeresis keep the TrueType hints, since the autohinter
+/// merges the two dots into a bar at 12–13 px.
 pub struct MonoGlyph {
     /// outline in pixels, origin at the pen position on the baseline, y down
     pub path: Option<tiny_skia::Path>,
@@ -88,9 +93,9 @@ pub struct MonoGlyph {
 }
 
 mod mono {
-    use super::{FontSpec, MONO_BOLD_TTF, MONO_TTF, MonoGlyph, SANS_BOLD_TTF, SANS_TTF};
+    use super::{FontSpec, MONO_BOLD_TTF, MONO_TTF, MonoGlyph, SANS_BOLD_TTF, SANS_TTF, keeps_truetype_hints};
     use skrifa::instance::{LocationRef, Size};
-    use skrifa::outline::{DrawSettings, HintingInstance, OutlinePen, Target};
+    use skrifa::outline::{DrawSettings, Engine, HintingInstance, HintingOptions, OutlinePen, Target};
     use skrifa::{FontRef, GlyphId, MetadataProvider};
     use std::cell::RefCell;
     use std::collections::HashMap;
@@ -120,7 +125,8 @@ mod mono {
 
     #[derive(Default)]
     struct Cache {
-        hinters: HashMap<Key, Option<HintingInstance>>,
+        /// per font and size: (autohinter, TrueType interpreter)
+        hinters: HashMap<Key, (Option<HintingInstance>, Option<HintingInstance>)>,
         glyphs: HashMap<(Key, char), Arc<MonoGlyph>>,
     }
 
@@ -142,14 +148,15 @@ mod mono {
             let font = FontRef::new(bytes(key.0)).expect("bundled font");
             let outlines = font.outline_glyphs();
             let size = Size::new(spec.px);
-            let hinter = c
-                .hinters
-                .entry(key)
-                .or_insert_with(|| HintingInstance::new(&outlines, size, LocationRef::default(), Target::Mono).ok());
+            let hinters = c.hinters.entry(key).or_insert_with(|| {
+                let make = |engine| HintingInstance::new(&outlines, size, LocationRef::default(), HintingOptions { engine, target: Target::Mono }).ok();
+                (make(Engine::Auto(None)), make(Engine::Interpreter))
+            });
+            let hinter = if keeps_truetype_hints(ch) { hinters.1.as_ref().or(hinters.0.as_ref()) } else { hinters.0.as_ref().or(hinters.1.as_ref()) };
             let gid = font.charmap().map(ch).unwrap_or(GlyphId::NOTDEF);
             let linear = font.glyph_metrics(size, LocationRef::default()).advance_width(gid).unwrap_or(0.0);
             let mut pen = Pen(tiny_skia::PathBuilder::new());
-            let advance = match (outlines.get(gid), hinter.as_ref()) {
+            let advance = match (outlines.get(gid), hinter) {
                 (Some(outline), Some(h)) => outline.draw(DrawSettings::hinted(h, false), &mut pen).ok().and_then(|m| m.advance_width),
                 (Some(outline), None) => outline.draw(DrawSettings::unhinted(size, LocationRef::default()), &mut pen).ok().and(None),
                 _ => None,
@@ -161,6 +168,11 @@ mod mono {
             g
         })
     }
+}
+
+/// Letters whose marks the autohinter fuses (two dots → one bar).
+fn keeps_truetype_hints(ch: char) -> bool {
+    matches!(ch, 'ё' | 'Ё' | 'ä' | 'ë' | 'ï' | 'ö' | 'ü' | 'ÿ' | 'Ä' | 'Ë' | 'Ï' | 'Ö' | 'Ü' | 'Ÿ' | 'ї' | 'Ї')
 }
 
 pub fn mono_glyph(spec: &FontSpec, ch: char) -> std::sync::Arc<MonoGlyph> {

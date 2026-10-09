@@ -39,12 +39,12 @@ pub fn normalize_mac(mac: &str) -> String {
     mac.trim().to_ascii_uppercase().replace('-', ":")
 }
 
-/// Opens the link; errors are short human-readable texts (Russian where we produce them).
+/// Opens the link; errors are short human-readable texts (translated where we produce them).
 pub fn open(address: &str, channel: u8) -> Result<Box<dyn Transport>, String> {
     if is_device_path(address) {
         return serial::open(address);
     }
-    let mac = parse_mac(address).ok_or_else(|| format!("неверный MAC-адрес \"{address}\""))?;
+    let mac = parse_mac(address).ok_or_else(|| tr!("transport.bad_mac", address = address))?;
     rfcomm::open(mac, channel)
 }
 
@@ -70,7 +70,7 @@ mod rfcomm {
         unsafe {
             let p = libc::strerror(code);
             if p.is_null() {
-                return format!("ошибка {code}");
+                return tr!("transport.error_code", code = code);
             }
             std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
         }
@@ -106,7 +106,7 @@ mod rfcomm {
                 let mut p = libc::pollfd { fd: raw, events: libc::POLLOUT, revents: 0 };
                 let n = libc::poll(&mut p, 1, 12_000);
                 if n == 0 {
-                    return Err("таймаут подключения".into());
+                    return Err(tr!("transport.connect_timeout").into());
                 }
                 let mut soerr: libc::c_int = 0;
                 let mut len = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
@@ -140,7 +140,7 @@ mod rfcomm {
                 return Ok(0);
             }
             if p.revents & (libc::POLLHUP | libc::POLLERR) != 0 && p.revents & libc::POLLIN == 0 {
-                return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "связь разорвана"));
+                return Err(io::Error::new(io::ErrorKind::ConnectionAborted, tr!("transport.link_broken")));
             }
             let n = if socket {
                 libc::recv(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len(), 0)
@@ -148,7 +148,7 @@ mod rfcomm {
                 libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
             };
             if n <= 0 {
-                return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "колонка закрыла соединение"));
+                return Err(io::Error::new(io::ErrorKind::ConnectionAborted, tr!("transport.closed_by_device")));
             }
             Ok(n as usize)
         }
@@ -218,7 +218,7 @@ mod rfcomm {
             WSAStartup(0x0202, &mut data);
             let s = socket(AF_BTH as i32, SOCK_STREAM, BTHPROTO_RFCOMM as i32);
             if s == INVALID_SOCKET {
-                return Err(format!("ошибка сокета {}", WSAGetLastError()));
+                return Err(tr!("transport.socket_error", code = WSAGetLastError()));
             }
             let mut addr: SOCKADDR_BTH = std::mem::zeroed();
             addr.addressFamily = AF_BTH;
@@ -227,7 +227,7 @@ mod rfcomm {
             if connect(s, &addr as *const SOCKADDR_BTH as *const SOCKADDR, std::mem::size_of::<SOCKADDR_BTH>() as i32) != 0 {
                 let e = WSAGetLastError();
                 closesocket(s);
-                return Err(format!("нет соединения (WSA {e})"));
+                return Err(tr!("transport.no_connection_wsa", code = e));
             }
             let timeout: u32 = 3000;
             setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeout as *const u32 as *const u8, 4);
@@ -256,11 +256,11 @@ mod rfcomm {
                     return Ok(0);
                 }
                 if rc < 0 || (p.revents & (POLLHUP | POLLERR)) != 0 && (p.revents & POLLRDNORM) == 0 {
-                    return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "связь разорвана"));
+                    return Err(io::Error::new(io::ErrorKind::ConnectionAborted, tr!("transport.link_broken")));
                 }
                 let n = recv(self.s, buf.as_mut_ptr(), buf.len() as i32, 0);
                 if n <= 0 {
-                    return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "колонка закрыла соединение"));
+                    return Err(io::Error::new(io::ErrorKind::ConnectionAborted, tr!("transport.closed_by_device")));
                 }
                 Ok(n as usize)
             }
@@ -281,7 +281,7 @@ mod rfcomm {
     use super::Transport;
 
     pub fn open(_mac: [u8; 6], _channel: u8) -> Result<Box<dyn Transport>, String> {
-        Err("на этой платформе укажите вместо MAC путь к последовательному порту колонки (например /dev/cu.DivoomMiniToo-App)".into())
+        Err(tr!("transport.use_serial_path").into())
     }
 }
 
@@ -353,7 +353,7 @@ mod serial {
         fn recv(&mut self, buf: &mut [u8], timeout_ms: i32) -> io::Result<usize> {
             let _ = self.port.set_timeout(Duration::from_millis(timeout_ms.max(1) as u64));
             match self.port.read(buf) {
-                Ok(0) => Err(io::Error::new(io::ErrorKind::ConnectionAborted, "порт закрыт")),
+                Ok(0) => Err(io::Error::new(io::ErrorKind::ConnectionAborted, tr!("transport.port_closed"))),
                 Ok(n) => Ok(n),
                 Err(e) if e.kind() == io::ErrorKind::TimedOut => Ok(0),
                 Err(e) => Err(e),

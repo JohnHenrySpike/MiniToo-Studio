@@ -150,14 +150,14 @@ pub fn compact(n: i64) -> String {
 }
 
 pub fn summary(t: &Totals) -> String {
-    format!(
-        "сегодня: {} токенов (вход {}, выход {}, кэш {}), ответов {}, запросов {}",
-        compact(t.all()),
-        compact(t.input),
-        compact(t.output),
-        compact(t.cache_read + t.cache_write),
-        t.replies,
-        t.prompts
+    tr!(
+        "claudestats.summary",
+        total = compact(t.all()),
+        input = compact(t.input),
+        output = compact(t.output),
+        cache = compact(t.cache_read + t.cache_write),
+        replies = t.replies,
+        prompts = t.prompts
     )
 }
 
@@ -181,7 +181,7 @@ pub fn frame(sessions: &[Session], t: &Totals) -> Frame {
 
     let mut y = 26.0;
     if sessions.is_empty() {
-        c.text(r(8.0, y, 144.0, 18.0), Align::LEFT, "нет активных сессий", FontSpec::sans(10.0), dim);
+        c.text(r(8.0, y, 144.0, 18.0), Align::LEFT, tr!("claudestats.no_sessions"), FontSpec::sans(10.0), dim);
     }
     for s in sessions.iter().take(3) {
         let color = state_color(s.state);
@@ -192,14 +192,14 @@ pub fn frame(sessions: &[Session], t: &Totals) -> Frame {
         y += 20.0;
     }
     if sessions.len() > 3 {
-        c.text(r(22.0, y - 4.0, 130.0, 10.0), Align::LEFT, &format!("и ещё {}", sessions.len() - 3), FontSpec::sans(8.0), dim);
+        c.text(r(22.0, y - 4.0, 130.0, 10.0), Align::LEFT, &tr!("claudestats.more", count = sessions.len() - 3), FontSpec::sans(8.0), dim);
     }
 
     c.line(8.0, 90.0, 152.0, 90.0, 1.0, Color::rgb(55, 50, 65));
-    c.text(r(8.0, 94.0, 60.0, 16.0), Align::LEFT, "сегодня", FontSpec::sans(9.0), dim);
-    c.text(r(50.0, 92.0, 102.0, 18.0), Align::RIGHT, &format!("{} ток.", compact(t.all())), FontSpec::bold(13.0), Color::WHITE);
-    c.text(r(8.0, 111.0, 80.0, 14.0), Align::LEFT, &format!("ответов {}", t.replies), FontSpec::sans(9.0), dim);
-    c.text(r(72.0, 111.0, 80.0, 14.0), Align::RIGHT, &format!("вывод {}", compact(t.output)), FontSpec::sans(9.0), dim);
+    c.text(r(8.0, 94.0, 60.0, 16.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), dim);
+    c.text(r(50.0, 92.0, 102.0, 18.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(t.all())), FontSpec::bold(13.0), Color::WHITE);
+    c.text(r(8.0, 111.0, 80.0, 14.0), Align::LEFT, &tr!("claudestats.replies", count = t.replies), FontSpec::sans(9.0), dim);
+    c.text(r(72.0, 111.0, 80.0, 14.0), Align::RIGHT, &tr!("claudestats.output", output = compact(t.output)), FontSpec::sans(9.0), dim);
     c.to_frame()
 }
 
@@ -239,10 +239,10 @@ impl LiveMode for ClaudeStats {
         "claudestats"
     }
     fn title(&self) -> &'static str {
-        "Статистика Claude"
+        tr!("claudestats.title")
     }
     fn subtitle(&self) -> &'static str {
-        "сессии и токены за сегодня"
+        tr!("claudestats.subtitle")
     }
     fn icon(&self) -> &'static str {
         "sparkle"

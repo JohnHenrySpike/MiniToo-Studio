@@ -146,7 +146,7 @@ pub fn draw(style: i64, levels: &[f64; BANDS], peaks: &[f64; BANDS], quiet: bool
     let mut c = Canvas::device();
     c.fill(Color::rgb(8, 8, 14));
     if quiet {
-        c.text(r(0.0, 50.0, 160.0, 24.0), Align::CENTER, "тишина…", FontSpec::bold(12.0), Color::rgb(90, 90, 120));
+        c.text(r(0.0, 50.0, 160.0, 24.0), Align::CENTER, tr!("visualizer.silence"), FontSpec::bold(12.0), Color::rgb(90, 90, 120));
     } else if style == 0 {
         // segmented bars with peak caps
         c.aa = false;
@@ -245,10 +245,10 @@ impl LiveMode for Visualizer {
         "visualizer"
     }
     fn title(&self) -> &'static str {
-        "Визуализатор звука"
+        tr!("visualizer.title")
     }
     fn subtitle(&self) -> &'static str {
-        "спектр того, что играет на компьютере"
+        tr!("visualizer.subtitle")
     }
     fn icon(&self) -> &'static str {
         "wave"
@@ -268,7 +268,7 @@ impl LiveMode for Visualizer {
         match capture::AudioCapture::start(self.ring.clone(), on_error) {
             Ok(c) => {
                 self.capture = Some(c);
-                cx.set_status("слушаю системный звук");
+                cx.set_status(tr!("visualizer.listening"));
             }
             Err(e) => self.fail(cx, e),
         }
@@ -350,13 +350,13 @@ pub mod capture {
                 move |ml| setup(ml, ring, on_error),
                 move |e| err2(e),
             )
-            .map_err(|_| "нет подключения к PipeWire".to_string())?;
+            .map_err(|_| tr!("visualizer.err.no_pipewire").to_string())?;
             Ok(AudioCapture { _thread: thread })
         }
     }
 
     fn setup(ml: &pw::main_loop::MainLoopRc, ring: SharedRing, on_error: Arc<ErrorFn>) -> Result<pipewire_util::Guard, String> {
-        let no_pw = |_| "нет подключения к PipeWire".to_string();
+        let no_pw = |_| tr!("visualizer.err.no_pipewire").to_string();
         let context = pw::context::ContextRc::new(ml, None).map_err(no_pw)?;
         let core = context.connect_rc(None).map_err(no_pw)?;
         let stream = pw::stream::StreamRc::new(
@@ -377,7 +377,7 @@ pub mod capture {
             .add_local_listener_with_user_data(Data { ring, channels: 2, on_error })
             .state_changed(|_, d, _old, new| {
                 if let pw::stream::StreamState::Error(e) = new {
-                    (d.on_error)(format!("ошибка захвата звука: {e}"));
+                    (d.on_error)(tr!("visualizer.err.capture", error = e));
                 }
             })
             .param_changed(|_, d, id, param| {
@@ -413,7 +413,7 @@ pub mod capture {
             id: spa::param::ParamType::EnumFormat.as_raw(),
             properties: info.into(),
         }));
-        let pod = spa::pod::Pod::from_bytes(&bytes).ok_or("PipeWire: формат")?;
+        let pod = spa::pod::Pod::from_bytes(&bytes).ok_or(tr!("visualizer.err.pw_format"))?;
         stream
             .connect(
                 spa::utils::Direction::Input,
@@ -459,24 +459,24 @@ pub mod capture {
                 move |data: &[T], _: &cpal::InputCallbackInfo| {
                     ring.lock().push_interleaved(data.iter().map(|s| <f32 as cpal::FromSample<T>>::from_sample_(*s)), channels);
                 },
-                move |e| on_error(format!("ошибка захвата звука: {e}")),
+                move |e| on_error(tr!("visualizer.err.capture", error = e)),
                 None,
             )
-            .map_err(|e| format!("ошибка захвата звука: {e}"))
+            .map_err(|e| tr!("visualizer.err.capture", error = e))
     }
 
     fn open(ring: SharedRing, on_error: Arc<ErrorFn>) -> Result<cpal::Stream, String> {
         let host = cpal::default_host();
         #[cfg(windows)]
         let (device, config) = {
-            let d = host.default_output_device().ok_or("нет устройства вывода звука")?;
-            let c = d.default_output_config().map_err(|e| format!("ошибка захвата звука: {e}"))?;
+            let d = host.default_output_device().ok_or(tr!("visualizer.err.no_output"))?;
+            let c = d.default_output_config().map_err(|e| tr!("visualizer.err.capture", error = e))?;
             (d, c)
         };
         #[cfg(not(windows))]
         let (device, config) = {
-            let d = host.default_input_device().ok_or("нет устройства записи звука")?;
-            let c = d.default_input_config().map_err(|e| format!("ошибка захвата звука: {e}"))?;
+            let d = host.default_input_device().ok_or(tr!("visualizer.err.no_input"))?;
+            let c = d.default_input_config().map_err(|e| tr!("visualizer.err.capture", error = e))?;
             (d, c)
         };
         let fmt = config.sample_format();
@@ -487,9 +487,9 @@ pub mod capture {
             cpal::SampleFormat::I32 => build::<i32>(&device, cfg, ring, on_error)?,
             cpal::SampleFormat::U16 => build::<u16>(&device, cfg, ring, on_error)?,
             cpal::SampleFormat::F64 => build::<f64>(&device, cfg, ring, on_error)?,
-            other => return Err(format!("неподдерживаемый формат звука: {other}")),
+            other => return Err(tr!("visualizer.err.unsupported_format", format = other)),
         };
-        stream.play().map_err(|e| format!("ошибка захвата звука: {e}"))?;
+        stream.play().map_err(|e| tr!("visualizer.err.capture", error = e))?;
         Ok(stream)
     }
 

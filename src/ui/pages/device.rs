@@ -30,7 +30,7 @@ impl Default for State {
             blue: 0,
             red: 0,
             app: 0,
-            text: "Привет!".into(),
+            text: tr!("device_page.notice.default_text").into(),
             hex: String::new(),
         }
     }
@@ -42,16 +42,16 @@ fn battery_card(ui: &mut Ui, cx: &mut Cx, min_h: f32) -> f32 {
     let d = &cx.snap.device;
     w::panel_measured(ui, [14.0, 14.0, 14.0, 17.0], None, min_h, |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
-        w::plate(ui, "батарея");
+        w::plate(ui, tr!("device_page.battery.plate"));
         w::battery(ui, d.battery.map(|b| b.min(100)), 4);
         let t = if d.battery.is_some() {
-            "Сообщает профиль Hands-Free, через BlueZ. Обновляется раз в 30 секунд."
+            tr!("device_page.battery.hint_known")
         } else {
-            "По протоколу приложения колонка заряд не сообщает. Его передаёт профиль Hands-Free, когда колонка подключена к компьютеру как аудиоустройство."
+            tr!("device_page.battery.hint_unknown")
         };
         w::hint_small(ui, t, 12.0);
         if !d.audio_connected {
-            let k = Key::new("Подключить как аудио").icon("bluetooth").tip("Колонка станет звуковым выходом компьютера (A2DP / Hands-Free)");
+            let k = Key::new(tr!("device_page.battery.connect_audio")).icon("bluetooth").tip(tr!("device_page.battery.connect_audio_tip"));
             if k.show(ui).clicked() {
                 cx.send(Command::ConnectAudio);
             }
@@ -63,22 +63,22 @@ fn battery_card(ui: &mut Ui, cx: &mut Cx, min_h: f32) -> f32 {
 fn screen_card(ui: &mut Ui, cx: &mut Cx, min_h: f32) -> f32 {
     w::panel_measured(ui, [14.0, 14.0, 14.0, 17.0], None, min_h, |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
-        w::plate(ui, "экран");
+        w::plate(ui, tr!("device_page.screen.plate"));
         let width = ui.available_width();
         w::row(ui, 33.0, 8.0, |ui| {
             let half = (width - 8.0) / 2.0;
-            if Key::new("Выключить").icon("power").width(half).show(ui).clicked() {
+            if Key::new(tr!("device_page.screen.off")).icon("power").width(half).show(ui).clicked() {
                 cx.send(Command::ScreenOnOff(false));
             }
-            if Key::new("Включить").icon("eye").width(half).show(ui).clicked() {
+            if Key::new(tr!("device_page.screen.on")).icon("eye").width(half).show(ui).clicked() {
                 cx.send(Command::ScreenOnOff(true));
             }
         });
-        let k = Key::new("Синхронизировать часы").icon("clock").width(width).tip("Установить на колонке время компьютера (для встроенных часов колонки)");
+        let k = Key::new(tr!("device_page.screen.sync_clock")).icon("clock").width(width).tip(tr!("device_page.screen.sync_clock_tip"));
         if k.show(ui).clicked() {
             cx.send(Command::SyncTime);
         }
-        w::hint_small(ui, "Яркость — ползунком под колонкой справа.", 12.0);
+        w::hint_small(ui, tr!("device_page.screen.brightness_hint"), 12.0);
     })
     .1
 }
@@ -88,7 +88,7 @@ fn sound_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, min_h: f32) -> f32 {
     let d = &cx.snap.device;
     w::panel_measured(ui, [14.0, 14.0, 14.0, 17.0], None, min_h, |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
-        w::plate(ui, "звук");
+        w::plate(ui, tr!("device_page.sound.plate"));
         let known = d.volume.is_some();
         let shown = st.volume.value(d.volume.unwrap_or(0) as f32);
         let label = if known { format!("{} / 15", shown.round() as i32) } else { "—".into() };
@@ -108,23 +108,23 @@ fn sound_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, min_h: f32) -> f32 {
         let audio = d.audio_connected;
         let playing = d.playing.unwrap_or(false);
         w::row(ui, 33.0, 8.0, |ui| {
-            if Key::icon_only("prev").enabled(audio).tip("Предыдущий трек").show(ui).clicked() {
+            if Key::icon_only("prev").enabled(audio).tip(tr!("device_page.sound.prev")).show(ui).clicked() {
                 cx.send(Command::PrevTrack);
             }
-            let k = Key::icon_only(if playing { "pause" } else { "play" }).enabled(audio).tip(if playing { "Пауза" } else { "Играть" });
+            let k = Key::icon_only(if playing { "pause" } else { "play" }).enabled(audio).tip(if playing { tr!("device_page.sound.pause") } else { tr!("device_page.sound.play") });
             if k.show(ui).clicked() {
                 cx.send(Command::PlayPause);
             }
-            if Key::icon_only("next").enabled(audio).tip("Следующий трек").show(ui).clicked() {
+            if Key::icon_only("next").enabled(audio).tip(tr!("device_page.sound.next")).show(ui).clicked() {
                 cx.send(Command::NextTrack);
             }
             let rest = ui.available_width();
-            w::para_w(ui, "плеер на устройстве, которое играет через колонку", w::font(12.0), p.text_dim, rest, egui::Align::Min);
+            w::para_w(ui, tr!("device_page.sound.player_note"), w::font(12.0), p.text_dim, rest, egui::Align::Min);
         });
         let t = if audio {
-            "Кнопки работают как клавиши на колонке: передают «играть / пауза / трек» плееру компьютера. Если плеер не запущен, ничего не произойдёт."
+            tr!("device_page.sound.hint_audio")
         } else {
-            "Колонка сейчас не подключена как аудио, поэтому кнопкам плеера некому передавать команды."
+            tr!("device_page.sound.hint_no_audio")
         };
         w::hint_small(ui, t, 12.0);
     })
@@ -165,14 +165,14 @@ fn cards(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
 fn lock_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     let p = pal();
     let d = &cx.snap.device;
-    w::group(ui, "Когда экран компьютера заблокирован", |ui| {
+    w::group(ui, tr!("device_page.lock.title"), |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
-        if w::switch(ui, d.away_enabled, "Показывать часы и приглушать яркость", true).clicked() {
+        if w::switch(ui, d.away_enabled, tr!("device_page.lock.show_clock"), true).clicked() {
             cx.send(Command::SetAwayEnabled(!d.away_enabled));
         }
         let en = d.away_enabled;
         w::row(ui, 30.0, 10.0, |ui| {
-            w::text(ui, "Яркость:", w::font(13.0), if en { p.text } else { p.text_disabled });
+            w::text(ui, tr!("device_page.lock.brightness"), w::font(13.0), if en { p.text } else { p.text_disabled });
             let shown = st.away.value(d.away_brightness as f32);
             let sw = (ui.available_width() - 60.0).min(320.0);
             let (_, v) = w::slider(ui, shown, 0.0, 100.0, 5.0, sw, en, "");
@@ -184,27 +184,24 @@ fn lock_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         if let Some(v) = st.away.poll(ui, 250) {
             cx.send(Command::SetAwayBrightness(v.round() as u8));
         }
-        let t = format!(
-            "{}Режим не меняется: после разблокировки колонка вернёт прежнюю картинку и яркость. Тревоги Claude и уведомления показываются и поверх часов.",
-            if cx.snap.away { "Сейчас экран заблокирован. " } else { "" }
-        );
-        w::hint_small(ui, &t, 12.0);
+        let t = if cx.snap.away { tr!("device_page.lock.hint_locked") } else { tr!("device_page.lock.hint") };
+        w::hint_small(ui, t, 12.0);
     });
 }
 
 fn builtin_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     let p = pal();
-    w::group(ui, "Встроенные экраны колонки", |ui| {
+    w::group(ui, tr!("device_page.builtin.title"), |ui| {
         ui.spacing_mut().item_spacing.y = 12.0;
         {
             let items = [
-                ("Космонавт", "sparkle", Builtin::Cosmonaut),
-                ("Галерея", "image", Builtin::Gallery),
-                ("Шумомер", "wave", Builtin::NoiseMeter),
-                ("Тетрис", "game", Builtin::Tetris),
-                ("Игра 2", "game", Builtin::Game2),
-                ("Игра 3", "game", Builtin::Game3),
-                ("Выйти из игры", "close", Builtin::ExitGame),
+                (tr!("device_page.builtin.cosmonaut"), "sparkle", Builtin::Cosmonaut),
+                (tr!("device_page.builtin.gallery"), "image", Builtin::Gallery),
+                (tr!("device_page.builtin.noise_meter"), "wave", Builtin::NoiseMeter),
+                (tr!("device_page.builtin.tetris"), "game", Builtin::Tetris),
+                (tr!("device_page.builtin.game2"), "game", Builtin::Game2),
+                (tr!("device_page.builtin.game3"), "game", Builtin::Game3),
+                (tr!("device_page.builtin.exit_game"), "close", Builtin::ExitGame),
             ];
             let keys = items.iter().map(|(t, icon, _)| Key::new(t).icon(icon)).collect();
             if let Some(i) = w::flow_keys(ui, None, keys, 8.0) {
@@ -212,34 +209,34 @@ fn builtin_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
             }
         }
         w::row(ui, 33.0, 8.0, |ui| {
-            w::text(ui, "Табло:", w::font(13.0), p.text);
-            w::text(ui, "синие", w::font(13.0), p.info);
+            w::text(ui, tr!("device_page.builtin.scoreboard"), w::font(13.0), p.text);
+            w::text(ui, tr!("device_page.builtin.blue"), w::font(13.0), p.info);
             if let Some(v) = Spin::new("score-blue", st.blue, 0, 999).show(ui) {
                 st.blue = v;
             }
-            w::text(ui, "красные", w::font(13.0), p.danger);
+            w::text(ui, tr!("device_page.builtin.red"), w::font(13.0), p.danger);
             if let Some(v) = Spin::new("score-red", st.red, 0, 999).show(ui) {
                 st.red = v;
             }
-            if Key::new("Показать").show(ui).clicked() {
+            if Key::new(tr!("device_page.builtin.show")).show(ui).clicked() {
                 cx.send(Command::Scoreboard { red: st.red as u16, blue: st.blue as u16 });
             }
         });
-        w::hint_small(ui, "Из встроенного экрана колонку выводит кнопка на ней самой или любая отправка из приложения.", 11.0);
+        w::hint_small(ui, tr!("device_page.builtin.hint"), 11.0);
     });
 }
 
 fn notice_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
-    w::group(ui, "Уведомление на колонке", |ui| {
+    w::group(ui, tr!("device_page.notice.title"), |ui| {
         ui.spacing_mut().item_spacing.y = 8.0;
         w::row(ui, 33.0, 8.0, |ui| {
             if let Some(i) = w::combo(ui, "notice-app", &APPS, st.app, 160.0) {
                 st.app = i;
             }
-            let send = Key::new("Отправить").icon("send");
-            let icon = Key::new("Значок").icon("bell").tip("Встроенное уведомление колонки: только значок выбранного приложения");
+            let send = Key::new(tr!("device_page.send")).icon("send");
+            let icon = Key::new(tr!("device_page.notice.icon")).icon("bell").tip(tr!("device_page.notice.icon_tip"));
             let kw = send.size(ui).x + icon.size(ui).x + 16.0;
-            w::text_field(ui, &mut st.text, Field { hint: "Текст уведомления", width: ui.available_width() - kw, ..Default::default() });
+            w::text_field(ui, &mut st.text, Field { hint: tr!("device_page.notice.text_hint"), width: ui.available_width() - kw, ..Default::default() });
             if send.show(ui).clicked() {
                 cx.send(Command::DeviceNotifyCard { app: APPS[st.app].to_string(), text: st.text.clone() });
             }
@@ -249,10 +246,7 @@ fn notice_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         });
         w::hint_small(
             ui,
-            &format!(
-                "Встроенное уведомление колонки умеет показывать только значок, текст прошивка не выводит. Поэтому «Отправить» рисует карточку с текстом в приложении и держит её на экране {} с, как уведомления рабочего стола.",
-                cx.snap.notify.duration
-            ),
+            &tr!("device_page.notice.hint", secs = cx.snap.notify.duration),
             11.0,
         );
     });
@@ -261,7 +255,7 @@ fn notice_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
 fn info_group(ui: &mut Ui, cx: &mut Cx) {
     let p = pal();
     let d = &cx.snap.device;
-    w::group(ui, "Что сообщает колонка", |ui| {
+    w::group(ui, tr!("device_page.info.title"), |ui| {
         ui.spacing_mut().item_spacing.y = 8.0;
         let width = ui.available_width();
         let col_w = (width - 16.0) / 2.0;
@@ -280,7 +274,7 @@ fn info_group(ui: &mut Ui, cx: &mut Cx) {
         if cx.debug {
             w::row(ui, 18.0, 0.0, |ui| {
                 let (r, _) = ui.allocate_exact_size(vec2(166.0, 18.0), Sense::hover());
-                let g = w::galley(ui, "Пульс колонки", w::font(13.0), p.text_dim);
+                let g = w::galley(ui, tr!("device_page.info.heartbeat"), w::font(13.0), p.text_dim);
                 ui.painter().galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, p.text_dim);
                 let hb = d.heartbeat.clone().unwrap_or_else(|| "—".into());
                 w::text_elided(ui, &hb, w::mono(11.0), p.text, None);
@@ -290,14 +284,14 @@ fn info_group(ui: &mut Ui, cx: &mut Cx) {
 }
 
 fn diag_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
-    w::group(ui, "Диагностика", |ui| {
+    w::group(ui, tr!("device_page.diag.title"), |ui| {
         ui.spacing_mut().item_spacing.y = 8.0;
         let mut send = false;
         w::row(ui, 33.0, 8.0, |ui| {
             w::pixel_icon(ui, "terminal", 2, pal().text, None);
-            let key = Key::new("Отправить");
+            let key = Key::new(tr!("device_page.send"));
             let kw = key.size(ui).x;
-            let r = w::text_field(ui, &mut st.hex, Field { hint: "hex: <команда> <аргументы>, например 09", width: ui.available_width() - kw - 8.0, mono: true, ..Default::default() });
+            let r = w::text_field(ui, &mut st.hex, Field { hint: tr!("device_page.diag.hex_hint"), width: ui.available_width() - kw - 8.0, mono: true, ..Default::default() });
             if w::submitted(ui, &r) {
                 send = true;
             }
@@ -310,10 +304,7 @@ fn diag_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         }
         w::hint_small(
             ui,
-            &format!(
-                "Ответы — в журнале справа и на http://127.0.0.1:{}/device. Не отправляйте команды сна 0x40, 0xa3, 0xa4, 0xad, 0xae — они зависают колонку до выключения питания.",
-                cx.snap.claude.port
-            ),
+            &tr!("device_page.diag.hint", port = cx.snap.claude.port),
             11.0,
         );
     });
@@ -322,8 +313,8 @@ fn diag_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
 pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     scroll_page(ui, "device-page", None, |ui| {
         let connected = cx.snap.device.conn == Conn::Connected;
-        let sub = if connected { "что умеет и что сообщает MiniToo" } else { "колонка не подключена — команды уйдут после подключения" };
-        w::page_header(ui, "Колонка", sub, |_| {});
+        let sub = if connected { tr!("device_page.subtitle") } else { tr!("device_page.subtitle_disconnected") };
+        w::page_header(ui, tr!("device_page.title"), sub, |_| {});
         cards(ui, cx, st);
         lock_group(ui, cx, st);
         builtin_group(ui, cx, st);

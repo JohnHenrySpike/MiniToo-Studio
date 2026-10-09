@@ -1,5 +1,8 @@
 //! MiniToo Studio core library.
 
+// first: the `tr!` / `trn!` macros are used by every module below
+#[macro_use]
+pub mod i18n;
 pub mod canvas;
 pub mod color;
 pub mod fonts;

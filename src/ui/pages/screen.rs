@@ -18,18 +18,16 @@ fn stale_panel(ui: &mut Ui, cx: &mut Cx) {
     let p = pal();
     let units = cx.snap.screen.stale_portals.join(", ");
     w::panel(ui, |ui| {
-        let key = Key::new("Перезапустить").icon("refresh").accent(true);
+        let key = Key::new(tr!("screen.stale.restart")).icon("refresh").accent(true);
         let kw = key.size(ui).x;
         let text_w = ui.available_width() - 36.0 - kw - 28.0;
-        let msg = format!(
-            "После обновления системы служба портала работает со старыми библиотеками, и окно выбора экрана не открывается. Её нужно перезапустить ({units})."
-        );
+        let msg = tr!("screen.stale.message", units = units);
         let th = 15.0 + 2.0 + w::galley_wrapped(ui, &msg, w::font(13.0), p.text_dim, text_w).size().y;
         w::row(ui, th.max(36.0), 14.0, |ui| {
             w::pixel_icon(ui, "warning", 3, p.warn, None);
             w::col(ui, text_w, th, |ui| {
                 ui.spacing_mut().item_spacing.y = 2.0;
-                w::pixel_text(ui, "Портал захвата экрана устарел", PixStyle::new(12), p.text);
+                w::pixel_text(ui, tr!("screen.stale.title"), PixStyle::new(12), p.text);
                 w::hint(ui, &msg);
             });
             if key.show(ui).clicked() {
@@ -62,16 +60,16 @@ fn canvas(ui: &mut Ui, cx: &mut Cx, rect: Rect) {
     let selecting = s.status == CaptureStatus::Selecting;
     let width = (rect.width() - 60.0).min(540.0);
     let big = PixStyle::new(12).zoom(2);
-    let title = if selecting { "Выберите экран или окно…" } else { "Захват не запущен" };
-    let start = if s.has_token { "Начать захват" } else { "Выбрать экран…" };
+    let title = if selecting { tr!("screen.canvas.selecting_title") } else { tr!("screen.canvas.idle_title") };
+    let start = if s.has_token { tr!("screen.start_capture") } else { tr!("screen.choose_screen") };
     let text = if selecting {
-        "KDE показывает диалог выбора — он может открыться за этим окном.".to_string()
+        tr!("screen.canvas.selecting_text").to_string()
     } else {
-        format!("Нажмите «{start}». KDE спросит, какой экран или окно показать; выбор запомнится. Затем выделите область рамкой и нажмите «Транслировать».")
+        tr!("screen.canvas.idle_text", start = start, stream = tr!("screen.stream"))
     };
     let g = ui.fonts_mut(|f| f.layout_job(w::job(&text, w::font(13.0), hex(0xb9b0a2), width, Align::Center)));
     let err = s.error.as_ref().map(|e| {
-        ui.fonts_mut(|f| f.layout_job(w::job(&format!("Ошибка захвата: {e}"), w::font(13.0), hex(0xff8a70), width, Align::Center)))
+        ui.fonts_mut(|f| f.layout_job(w::job(&tr!("screen.canvas.error", error = e), w::font(13.0), hex(0xff8a70), width, Align::Center)))
     });
     let ts = big.measure(title);
     let h = 60.0 + 14.0 + ts.y + 14.0 + g.size().y + err.as_ref().map(|e| 14.0 + e.size().y).unwrap_or(0.0);
@@ -94,7 +92,7 @@ fn bottom(ui: &mut Ui, cx: &mut Cx, rect: Rect) {
     w::paint_panel(ui.painter(), rect);
     let inner = Rect::from_min_max(rect.min + vec2(14.0, 14.0), rect.max - vec2(14.0, 17.0));
     let capturing = s.status == CaptureStatus::Capturing;
-    let key = Key::new(if s.streaming { "Остановить" } else { "Транслировать" })
+    let key = Key::new(if s.streaming { tr!("screen.stop") } else { tr!("screen.stream") })
         .icon(if s.streaming { "stop" } else { "play" })
         .accent(!s.streaming)
         .height(48.0)
@@ -112,29 +110,26 @@ fn bottom(ui: &mut Ui, cx: &mut Cx, rect: Rect) {
             let col = ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 8.0;
                 w::row(ui, 33.0, 10.0, |ui| {
-                    w::text(ui, "Частота", w::font(13.0), p.text);
-                    let fmt = |v: i64| format!("{v} к/с");
+                    w::text(ui, tr!("screen.fps"), w::font(13.0), p.text);
+                    let fmt = |v: i64| tr!("screen.fps_value", v = v);
                     if let Some(v) = Spin::new("fps", s.fps as i64, 1, 20).width(130.0).fmt(&fmt).show(ui) {
                         cx.send(Command::SetFps(v as u32));
                     }
-                    let r = w::checkbox(ui, s.crisp, "Чёткие пиксели", true);
-                    let r = w::tip(r, "Без сглаживания при уменьшении — для пиксель-арта и мелкого текста");
+                    let r = w::checkbox(ui, s.crisp, tr!("screen.crisp"), true);
+                    let r = w::tip(r, tr!("screen.crisp_tip"));
                     if r.clicked() {
                         cx.send(Command::SetCrisp(!s.crisp));
                     }
                 });
                 w::row(ui, 33.0, 10.0, |ui| {
-                    w::text(ui, "Качество", w::font(13.0), p.text);
+                    w::text(ui, tr!("screen.quality.label"), w::font(13.0), p.text);
                     let before = ui.cursor().left();
-                    if let Some(i) = w::tabs(ui, &[("Максимум", None), ("Баланс", None), ("Скорость", None)], s.quality.clamp(0, 2) as usize) {
+                    if let Some(i) = w::tabs(ui, &[(tr!("screen.quality.max"), None), (tr!("screen.quality.balance"), None), (tr!("screen.quality.speed"), None)], s.quality.clamp(0, 2) as usize) {
                         cx.send(Command::SetQuality(i as i64));
                     }
                     let tabs_rect = Rect::from_min_max(pos2(before, ui.min_rect().top()), pos2(ui.cursor().left(), ui.min_rect().bottom()));
                     let r = ui.interact(tabs_rect, ui.id().with("quality-tip"), Sense::hover());
-                    w::tip(
-                        r,
-                        "«Баланс» и «Скорость» уменьшают цвет до RGB565/RGB444 — кадр меньше и приходит быстрее. Неизменный экран повторно не передаётся.",
-                    );
+                    w::tip(r, tr!("screen.quality.tip"));
                 });
             });
             let rest = ui.available_width();
@@ -143,14 +138,16 @@ fn bottom(ui: &mut Ui, cx: &mut Cx, rect: Rect) {
                 ui.set_width(rest);
                 ui.spacing_mut().item_spacing.y = 4.0;
                 if s.streaming {
-                    let mut t = format!("Фактически {:.1} к/с", s.actual_fps);
-                    if s.frame_kb > 0.0 {
-                        t.push_str(&format!(",  кадр {:.1} КБ", s.frame_kb));
-                    }
+                    let fps = format!("{:.1}", s.actual_fps);
+                    let t = if s.frame_kb > 0.0 {
+                        tr!("screen.actual_fps_frame", fps = fps, kb = format!("{:.1}", s.frame_kb))
+                    } else {
+                        tr!("screen.actual_fps", fps = fps)
+                    };
                     w::para(ui, &t, w::font(13.0), p.text);
                 }
                 if s.paused {
-                    w::para(ui, "Пауза: на колонке тревога Claude или уведомление", w::font(13.0), p.warn);
+                    w::para(ui, tr!("screen.paused"), w::font(13.0), p.warn);
                 }
             });
         });
@@ -163,26 +160,26 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, _st: &mut State) {
     let capturing = s.status == CaptureStatus::Capturing;
     let selecting = s.status == CaptureStatus::Selecting;
     let sub = match (capturing, s.source_size) {
-        (true, Some((w, h))) => format!("источник {w}×{h} — выделите область рамкой"),
-        _ => "трансляция области экрана или окна".into(),
+        (true, Some((w, h))) => tr!("screen.subtitle_source", width = w, height = h),
+        _ => tr!("screen.subtitle").into(),
     };
     let top = area(ui, full, |ui| {
         ui.spacing_mut().item_spacing.y = GAP;
-        w::page_header(ui, "Экран", &sub, |ui| {
+        w::page_header(ui, tr!("screen.title"), &sub, |ui| {
             if s.has_token || capturing {
-                let k = Key::new("Другой источник…").icon("refresh").enabled(!selecting).tip("Снова показать диалог выбора экрана или окна");
+                let k = Key::new(tr!("screen.other_source")).icon("refresh").enabled(!selecting).tip(tr!("screen.other_source_tip"));
                 if k.show(ui).clicked() {
                     cx.send(Command::SelectSource);
                 }
             }
             let (label, icon) = if capturing {
-                ("Остановить захват", "stop")
+                (tr!("screen.stop_capture"), "stop")
             } else if selecting {
-                ("Ожидание выбора…", "screen")
+                (tr!("screen.waiting"), "screen")
             } else if s.has_token {
-                ("Начать захват", "screen")
+                (tr!("screen.start_capture"), "screen")
             } else {
-                ("Выбрать экран…", "screen")
+                (tr!("screen.choose_screen"), "screen")
             };
             if Key::new(label).icon(icon).enabled(!selecting).show(ui).clicked() {
                 cx.send(if capturing {

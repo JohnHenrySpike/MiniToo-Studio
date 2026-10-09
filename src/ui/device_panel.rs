@@ -104,11 +104,12 @@ fn mock(ui: &mut Ui, cx: &mut Cx, origin: egui::Pos2) {
         let big = PixStyle::new(11).zoom(2);
         let small = PixStyle::new(9);
         let s1 = big.measure("MINITOO");
-        let s2 = small.measure("здесь будет экран колонки");
+        let placeholder = tr!("panel.screen_placeholder");
+        let s2 = small.measure(placeholder);
         let h = s1.y + 6.0 + s2.y;
         let top = glass.center().y - h / 2.0;
         pixel::paint_text(&painter, pos2(glass.center().x - s1.x / 2.0, top), "MINITOO", &big, hex(0x3a3f4c));
-        pixel::paint_text(&painter, pos2(glass.center().x - s2.x / 2.0, top + s1.y + 6.0), "здесь будет экран колонки", &small, hex(0x5a6070));
+        pixel::paint_text(&painter, pos2(glass.center().x - s2.x / 2.0, top + s1.y + 6.0), placeholder, &small, hex(0x5a6070));
     }
     let frame_bottom = sf_min.y + ssize.y;
     w::paint_plate(&painter, pos2(sf_min.x, frame_bottom + 12.0), "minitoo", hex(0x4a4744), hex(0xe9e0d1));
@@ -122,7 +123,7 @@ fn mock(ui: &mut Ui, cx: &mut Cx, origin: egui::Pos2) {
     w::paint_plastic(&painter, skey, (if hov { p.accent_hi } else { p.accent }).gamma_multiply(op), p.accent_edge.gamma_multiply(op), None, 4.0, 3.0, down);
     let cy = skey.center().y + if down { 1.0 } else { -1.0 };
     pixel::paint_icon(&painter, pos2(skey.center().x - 6.0, cy - 6.0), if d.screen_on { "eye" } else { "power" }, 1, WHITE, None);
-    let sresp = w::tip_disabled(sresp, if d.screen_on { "Выключить экран колонки" } else { "Включить экран колонки" });
+    let sresp = w::tip_disabled(sresp, if d.screen_on { tr!("panel.screen_off") } else { tr!("panel.screen_on") });
     if sresp.clicked() {
         cx.send(Command::ScreenOnOff(!d.screen_on));
     }
@@ -131,11 +132,11 @@ fn mock(ui: &mut Ui, cx: &mut Cx, origin: egui::Pos2) {
     let vol = d.volume.unwrap_or(0);
     let playing = d.playing.unwrap_or(false);
     let keys: [(&str, &str, Command); 5] = [
-        ("volume-down", "Тише", Command::SetVolume(vol.saturating_sub(1))),
-        ("volume-up", "Громче", Command::SetVolume((vol + 1).min(15))),
-        ("prev", "Предыдущий трек", Command::PrevTrack),
-        (if playing { "pause" } else { "play" }, "Пауза / воспроизведение", Command::PlayPause),
-        ("next", "Следующий трек", Command::NextTrack),
+        ("volume-down", tr!("panel.volume_down"), Command::SetVolume(vol.saturating_sub(1))),
+        ("volume-up", tr!("panel.volume_up"), Command::SetVolume((vol + 1).min(15))),
+        ("prev", tr!("panel.prev_track"), Command::PrevTrack),
+        (if playing { "pause" } else { "play" }, tr!("panel.play_pause"), Command::PlayPause),
+        ("next", tr!("panel.next_track"), Command::NextTrack),
     ];
     for (i, (icon, tip, cmd)) in keys.into_iter().enumerate() {
         let r = Rect::from_min_size(base.min + vec2(18.0 + i as f32 * 40.0, 18.0), vec2(34.0, 26.0));
@@ -163,7 +164,7 @@ fn mock(ui: &mut Ui, cx: &mut Cx, origin: egui::Pos2) {
     painter.circle_stroke(dc, 11.0, Stroke::new(2.0, hex(0xa8301f)));
     let hl = Rect::from_min_size(dc + vec2(-6.0, -8.0), vec2(8.0, 4.0));
     painter.rect_filled(hl, 2, hex(0xff9a86).gamma_multiply(0.8));
-    let kresp = w::tip(kresp, if d.conn == Conn::Disconnected { "Подключить колонку" } else { "Отключить колонку" });
+    let kresp = w::tip(kresp, if d.conn == Conn::Disconnected { tr!("panel.connect") } else { tr!("panel.disconnect") });
     if kresp.clicked() {
         cx.send(Command::Connect(d.conn == Conn::Disconnected));
     }
@@ -189,9 +190,9 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     // connection and battery
     w::row(ui, 22.0, 8.0, |ui| {
         let (color, text) = match d.conn {
-            Conn::Disconnected => (p.text_disabled, "Нет связи"),
-            Conn::Connecting => (p.warn, "Подключение…"),
-            Conn::Connected => (p.ok, "Подключена"),
+            Conn::Disconnected => (p.text_disabled, tr!("panel.conn.disconnected")),
+            Conn::Connecting => (p.warn, tr!("panel.conn.connecting")),
+            Conn::Connected => (p.ok, tr!("panel.conn.connected")),
         };
         w::led(ui, color, d.conn != Conn::Disconnected, d.conn == Conn::Connecting);
         w::pixel_text(ui, text, PixStyle::new(12), p.text);
@@ -203,10 +204,11 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         }
     });
 
-    let mut on_screen = format!("На экране: {}", cx.snap.on_screen);
-    if cx.snap.interrupted {
-        on_screen.push_str("  •  тревога Claude");
-    }
+    let on_screen = if cx.snap.interrupted {
+        tr!("panel.on_screen_alert", what = cx.snap.on_screen)
+    } else {
+        tr!("panel.on_screen", what = cx.snap.on_screen)
+    };
     w::text_elided(ui, &on_screen, w::font(13.0), p.text_dim, None);
     if !cx.snap.last_transfer.is_empty() {
         ui.add_space(-8.0);
@@ -219,7 +221,7 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     w::row(ui, 30.0, 8.0, |ui| {
         w::pixel_icon(ui, "sun", 1, p.text_dim, None);
         let shown = st.brightness.value(d.brightness as f32);
-        let (_, v) = w::slider(ui, shown, 0.0, 100.0, 5.0, slider_w, true, "Яркость экрана");
+        let (_, v) = w::slider(ui, shown, 0.0, 100.0, 5.0, slider_w, true, tr!("panel.brightness"));
         if (v - shown).abs() > 0.01 {
             st.brightness.moved(v);
         }
@@ -232,7 +234,7 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         w::pixel_icon(ui, "volume", 1, p.text_dim, None);
         let known = d.volume.is_some();
         let shown = st.volume.value(d.volume.unwrap_or(0) as f32);
-        let (_, v) = w::slider(ui, shown, 0.0, 15.0, 1.0, slider_w, known, "Громкость колонки");
+        let (_, v) = w::slider(ui, shown, 0.0, 15.0, 1.0, slider_w, known, tr!("panel.volume"));
         if known && (v - shown).abs() > 0.01 {
             st.volume.moved(v);
         }
@@ -248,7 +250,12 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     if cx.debug {
         ui.add_space(2.0);
         let n = cx.snap.log.len();
-        let label = format!("{}{}", if st.log_open { "Скрыть журнал" } else { "Журнал" }, if n > 0 { format!("  ({n})") } else { String::new() });
+        let label = match (st.log_open, n > 0) {
+            (true, true) => tr!("panel.log_hide_count", count = n),
+            (true, false) => tr!("panel.log_hide").to_string(),
+            (false, true) => tr!("panel.log_show_count", count = n),
+            (false, false) => tr!("panel.log_show").to_string(),
+        };
         let key = Key::new(&label).flat().icon(if st.log_open { "down" } else { "up" }).width(ui.available_width());
         if key.show(ui).clicked() {
             st.log_open = !st.log_open;
@@ -268,7 +275,7 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
                 }
             });
             let tr = Rect::from_min_size(pos2(rect.right() - 34.0, rect.top() + 4.0), vec2(30.0, 30.0));
-            if Key::icon_only("trash").flat().tip("Очистить журнал").show_at(ui, tr).clicked() {
+            if Key::icon_only("trash").flat().tip(tr!("panel.log_clear")).show_at(ui, tr).clicked() {
                 cx.send(Command::ClearLog);
             }
         }

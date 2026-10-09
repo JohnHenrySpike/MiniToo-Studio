@@ -1392,6 +1392,7 @@ fn chill_bath() -> Scene {
 struct Variant {
     state: ClaudeState,
     id: &'static str,
+    /// catalog key of the display title
     title: &'static str,
     key_frame: usize,
     make: fn() -> Scene,
@@ -1410,25 +1411,25 @@ const fn v(
 const VARIANTS: [Variant; 19] = {
     use ClaudeState::{Alerting as A, Chilling as C, Working as W};
     [
-        v(W, "classic", "Ноутбук", 2, working),
-        v(W, "hammer", "Кузнец", 2, work_hammer),
-        v(W, "gears", "Шестерёнки", 1, work_gears),
-        v(W, "scroll", "Свиток", 0, work_scroll),
-        v(W, "treadmill", "Пробежка", 1, work_treadmill),
-        v(W, "juggle", "Жонглёр", 1, work_juggle),
-        v(W, "progress", "Прогресс", 5, work_progress),
-        v(A, "classic", "Тревога!", 2, alerting),
-        v(A, "wave", "Машет руками", 0, alert_wave),
-        v(A, "bell", "Колокол", 2, alert_bell),
-        v(A, "siren", "Мигалка", 1, alert_siren),
-        v(A, "sign", "Табличка «?»", 0, alert_sign),
-        v(A, "knock", "Тук-тук", 2, alert_knock),
-        v(C, "classic", "Сон под луной", 3, chilling),
-        v(C, "coffee", "Кофе", 2, chill_coffee),
-        v(C, "fishing", "Рыбалка", 2, chill_fishing),
-        v(C, "beach", "Пляж", 0, chill_beach),
-        v(C, "cloud", "Облачко", 4, chill_cloud),
-        v(C, "bath", "Ванна", 2, chill_bath),
+        v(W, "classic", "faces.scene.working.classic", 2, working),
+        v(W, "hammer", "faces.scene.working.hammer", 2, work_hammer),
+        v(W, "gears", "faces.scene.working.gears", 1, work_gears),
+        v(W, "scroll", "faces.scene.working.scroll", 0, work_scroll),
+        v(W, "treadmill", "faces.scene.working.treadmill", 1, work_treadmill),
+        v(W, "juggle", "faces.scene.working.juggle", 1, work_juggle),
+        v(W, "progress", "faces.scene.working.progress", 5, work_progress),
+        v(A, "classic", "faces.scene.alerting.classic", 2, alerting),
+        v(A, "wave", "faces.scene.alerting.wave", 0, alert_wave),
+        v(A, "bell", "faces.scene.alerting.bell", 2, alert_bell),
+        v(A, "siren", "faces.scene.alerting.siren", 1, alert_siren),
+        v(A, "sign", "faces.scene.alerting.sign", 0, alert_sign),
+        v(A, "knock", "faces.scene.alerting.knock", 2, alert_knock),
+        v(C, "classic", "faces.scene.chilling.classic", 3, chilling),
+        v(C, "coffee", "faces.scene.chilling.coffee", 2, chill_coffee),
+        v(C, "fishing", "faces.scene.chilling.fishing", 2, chill_fishing),
+        v(C, "beach", "faces.scene.chilling.beach", 0, chill_beach),
+        v(C, "cloud", "faces.scene.chilling.cloud", 4, chill_cloud),
+        v(C, "bath", "faces.scene.chilling.bath", 2, chill_bath),
     ]
 };
 
@@ -1448,10 +1449,10 @@ pub fn variants(state: ClaudeState) -> &'static [&'static str] {
     }
 }
 
-/// Short Russian title («Ноутбук», «Кузнец», …); empty for an unknown variant.
+/// Short display title («Ноутбук», «Кузнец», …) in the interface language; empty for an unknown variant.
 pub fn variant_title(state: ClaudeState, variant: &str) -> String {
     let v = find(state, variant);
-    if v.id == variant { v.title.to_string() } else { String::new() }
+    if v.id == variant { tr!(v.title).to_string() } else { String::new() }
 }
 
 /// The most telling frame, for still previews.
@@ -1533,7 +1534,7 @@ pub fn export_faces(dir: &Path) -> std::io::Result<()> {
     sheet.text(
         r(GAP as f32, 0.0, (sw - 2 * GAP) as f32, HEAD as f32),
         Align::LEFT,
-        "MiniToo Studio — анимации статуса Claude (кадр-пример, 160×128)",
+        tr!("faces.sheet.heading"),
         big,
         Color::ACCENT,
     );
@@ -1549,7 +1550,7 @@ pub fn export_faces(dir: &Path) -> std::io::Result<()> {
             let y = (HEAD + row as i32 * (CELL_H + LABEL + GAP)) as f32;
             let key = key_frame(state, id).min(scene.frames.len().saturating_sub(1));
             sheet.draw_canvas(&Canvas::from_frame(&scene.frames[key]), x, y, 1.0);
-            let label = format!("{} / {id} · {} кадр.", state.id(), scene.frames.len());
+            let label = trn!("faces.sheet.label", scene.frames.len() as i64, state = state.id(), id = id);
             sheet.text(
                 r(x, y + CELL_H as f32 + 2.0, CELL_W as f32, 14.0),
                 Align::LEFT,
@@ -1561,7 +1562,7 @@ pub fn export_faces(dir: &Path) -> std::io::Result<()> {
             sheet.text(title_rect, Align::LEFT, &variant_title(state, id), big, Color::hex(0xf2eee8));
             if col == 0 {
                 // the default variant
-                sheet.text(title_rect, Align::RIGHT, "сейчас", small, Color::ACCENT);
+                sheet.text(title_rect, Align::RIGHT, tr!("faces.sheet.default"), small, Color::ACCENT);
             }
         }
     }

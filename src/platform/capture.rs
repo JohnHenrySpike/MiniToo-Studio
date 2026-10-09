@@ -210,8 +210,8 @@ mod linux {
 
     fn portal_error(step: &str, e: ashpd::Error) -> String {
         match e {
-            ashpd::Error::Response(ResponseError::Cancelled) => "выбор источника отменён".into(),
-            ashpd::Error::Response(ResponseError::Other) => "портал вернул ошибку".into(),
+            ashpd::Error::Response(ResponseError::Cancelled) => tr!("capture.cancelled").into(),
+            ashpd::Error::Response(ResponseError::Other) => tr!("capture.portal_error").into(),
             e => format!("{step}: {e}"),
         }
     }
@@ -220,7 +220,7 @@ mod linux {
         let proxy = match or_cancel(&mut cancel, Screencast::new()).await {
             None => return,
             Some(Ok(p)) => p,
-            Some(Err(e)) => return shared.finish(Some(format!("xdg-desktop-portal ScreenCast недоступен: {e}"))),
+            Some(Err(e)) => return shared.finish(Some(tr!("capture.portal_unavailable", error = e))),
         };
         let session = match or_cancel(&mut cancel, proxy.create_session(Default::default())).await {
             None => return,
@@ -251,7 +251,7 @@ mod linux {
                 .and_then(|r| r.response())
                 .map_err(|e| portal_error("Start", e))?;
             let new_token = streams.restore_token().map(str::to_string);
-            let node = streams.streams().first().map(|s| s.pipe_wire_node_id()).ok_or("портал не вернул поток")?;
+            let node = streams.streams().first().map(|s| s.pipe_wire_node_id()).ok_or(tr!("capture.no_stream"))?;
             let fd = proxy
                 .open_pipe_wire_remote(&session, Default::default())
                 .await
@@ -271,7 +271,7 @@ mod linux {
                     move |e| sh_err.finish(Some(e)),
                 );
                 match spawned {
-                    Err(_) => shared.finish(Some("не удалось запустить поток PipeWire".into())),
+                    Err(_) => shared.finish(Some(tr!("capture.pw_start_failed").into())),
                     Ok(t) => {
                         *shared.pw.lock() = Some(t);
                         if *cancel.borrow() {
@@ -283,7 +283,7 @@ mod linux {
                             tokio::select! {
                                 _ = cancel.wait_for(|c| *c) => {}
                                 Some(_) = async { match closed.as_mut() { Some(s) => s.next().await, None => std::future::pending().await } } => {
-                                    shared.finish(Some("сеанс захвата закрыт".into()));
+                                    shared.finish(Some(tr!("capture.session_closed").into()));
                                 }
                             }
                         }
@@ -402,8 +402,8 @@ mod linux {
         token: Option<String>,
         shared: Arc<Shared>,
     ) -> Result<pipewire_util::Guard, String> {
-        let context = pw::context::ContextRc::new(mainloop, None).map_err(|_| "не удалось запустить поток PipeWire".to_string())?;
-        let core = context.connect_fd_rc(fd, None).map_err(|_| "не удалось подключиться к PipeWire".to_string())?;
+        let context = pw::context::ContextRc::new(mainloop, None).map_err(|_| tr!("capture.pw_start_failed").to_string())?;
+        let core = context.connect_fd_rc(fd, None).map_err(|_| tr!("capture.pw_connect_failed").to_string())?;
         let stream = pw::stream::StreamRc::new(
             core,
             "minitoo-screen",
@@ -430,9 +430,9 @@ mod linux {
             .add_local_listener_with_user_data(data)
             .state_changed(|_, d, _old, new| match new {
                 pw::stream::StreamState::Error(e) => {
-                    d.fail(if e.is_empty() { "поток PipeWire закрыт".into() } else { e })
+                    d.fail(if e.is_empty() { tr!("capture.pw_closed").into() } else { e })
                 }
-                pw::stream::StreamState::Unconnected => d.fail("поток PipeWire закрыт".into()),
+                pw::stream::StreamState::Unconnected => d.fail(tr!("capture.pw_closed").into()),
                 _ => {}
             })
             .param_changed(|stream, d, id, param| {
@@ -491,7 +491,7 @@ mod linux {
             .map_err(|e| format!("PipeWire: {e}"))?;
 
         let bytes = enum_format_pod();
-        let pod = spa::pod::Pod::from_bytes(&bytes).ok_or("PipeWire: формат")?;
+        let pod = spa::pod::Pod::from_bytes(&bytes).ok_or(tr!("capture.pw_format"))?;
         stream
             .connect(
                 spa::utils::Direction::Input,
@@ -516,20 +516,20 @@ mod other {
         let sh = shared.clone();
         let spawned = std::thread::Builder::new().name("minitoo-capture".into()).spawn(move || run(sh));
         if spawned.is_err() {
-            shared.finish(Some("не удалось запустить захват экрана".into()));
+            shared.finish(Some(tr!("capture.start_failed").into()));
         }
     }
 
     fn primary() -> Result<xcap::Monitor, String> {
         let all = xcap::Monitor::all().map_err(|e| e.to_string())?;
         let idx = all.iter().position(|m| m.is_primary().unwrap_or(false)).unwrap_or(0);
-        all.into_iter().nth(idx).ok_or_else(|| "нет мониторов".to_string())
+        all.into_iter().nth(idx).ok_or_else(|| tr!("capture.no_monitors").to_string())
     }
 
     fn run(shared: Arc<Shared>) {
         let monitor = match primary() {
             Ok(m) => m,
-            Err(e) => return shared.finish(Some(format!("захват экрана недоступен: {e}"))),
+            Err(e) => return shared.finish(Some(tr!("capture.unavailable", error = e))),
         };
         let interval = Duration::from_millis(1000 / MAX_FPS);
         let mut size: Option<(u32, u32)> = None;
@@ -551,7 +551,7 @@ mod other {
                 Err(e) => {
                     failures += 1;
                     if size.is_none() || failures > 20 {
-                        return shared.finish(Some(format!("захват экрана не удался: {e}")));
+                        return shared.finish(Some(tr!("capture.failed", error = e)));
                     }
                 }
             }
@@ -649,13 +649,13 @@ pub async fn restart_units(units: Vec<String>) -> Result<(), String> {
             Ok(())
         } else {
             let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
-            Err(if err.is_empty() { format!("systemctl: код {}", out.status.code().unwrap_or(-1)) } else { err })
+            Err(if err.is_empty() { tr!("capture.systemctl_code", code = out.status.code().unwrap_or(-1)) } else { err })
         }
     }
     #[cfg(not(target_os = "linux"))]
     {
         let _ = units;
-        Err("недоступно".into())
+        Err(tr!("capture.restart_unsupported").into())
     }
 }
 

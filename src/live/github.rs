@@ -9,9 +9,10 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 pub const MAX_REPOS: usize = 4;
-pub const ERR_FORMAT: &str = "нужно owner/repo или ссылка на репозиторий";
-pub const ERR_DUPLICATE: &str = "уже в списке";
-pub const ERR_FULL: &str = "на экране помещается 4 репозитория";
+// catalog keys of the add errors; `tr!` them for display
+pub const ERR_FORMAT: &str = "github.err.format";
+pub const ERR_DUPLICATE: &str = "github.err.duplicate";
+pub const ERR_FULL: &str = "github.err.full";
 
 /// The latest run of a repository as far as we know.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -52,11 +53,11 @@ impl Run {
     fn detail(&self) -> String {
         let base = match self.state() {
             RunState::Error => return self.error.clone(),
-            RunState::Passed => "успешно".to_string(),
-            RunState::Failed => "упал".to_string(),
-            RunState::Running => "идёт".to_string(),
-            RunState::Loading => "загрузка…".to_string(),
-            RunState::Neutral if self.status == "none" => "нет запусков".to_string(),
+            RunState::Passed => tr!("github.state.passed").to_string(),
+            RunState::Failed => tr!("github.state.failed").to_string(),
+            RunState::Running => tr!("github.state.running").to_string(),
+            RunState::Loading => tr!("github.state.loading").to_string(),
+            RunState::Neutral if self.status == "none" => tr!("github.no_runs").to_string(),
             RunState::Neutral => self.conclusion.clone(),
         };
         if self.number > 0 { format!("{base}  ·  {} #{} ({})", self.workflow, self.number, self.branch) } else { base }
@@ -95,7 +96,7 @@ pub fn normalize_repo(input: &str) -> Option<String> {
     Some(format!("{owner}/{repo}"))
 }
 
-/// Adds a repository to `repos`, or returns one of the three error texts.
+/// Adds a repository to `repos`, or returns the catalog key of one of the three errors.
 pub fn add_repo(repos: &mut Vec<String>, input: &str) -> Result<String, &'static str> {
     let repo = normalize_repo(input).ok_or(ERR_FORMAT)?;
     if repos.iter().any(|r| r.eq_ignore_ascii_case(&repo)) {
@@ -111,10 +112,10 @@ pub fn add_repo(repos: &mut Vec<String>, input: &str) -> Result<String, &'static
 /// HTTP status → error text (0 = no network).
 pub fn error_text(code: u16) -> String {
     match code {
-        404 => "не найден или приватный".to_string(),
-        403 | 429 => "лимит API GitHub".to_string(),
-        0 => "нет сети".to_string(),
-        c => format!("ошибка {c}"),
+        404 => tr!("github.err.not_found").to_string(),
+        403 | 429 => tr!("github.err.rate_limit").to_string(),
+        0 => tr!("github.err.offline").to_string(),
+        c => tr!("github.err.http", code = c),
     }
 }
 
@@ -199,7 +200,7 @@ impl Github {
 
     fn fetch(&mut self, cx: &mut ModeCx) {
         if self.repos.is_empty() {
-            cx.set_status("добавьте репозитории owner/repo");
+            cx.set_status(tr!("github.status.empty"));
             self.render(cx);
             return;
         }
@@ -221,7 +222,7 @@ impl Github {
         c.text(r(8.0, 2.0, 144.0, 18.0), Align::LEFT, "GitHub Actions", FontSpec::bold(11.0), Color::WHITE);
         if self.repos.is_empty() {
             // two centred lines in (8, 40, 144×40), 12 px apart like Qt's line spacing
-            for (i, line) in ["добавьте репозитории", "в приложении"].iter().enumerate() {
+            for (i, line) in [tr!("github.screen.empty1"), tr!("github.screen.empty2")].iter().enumerate() {
                 let y = 48.5 + 12.0 * i as f32;
                 c.text(r(8.0, y, 144.0, 12.0), Align::CENTER, line, FontSpec::sans(10.0), Color::rgb(140, 150, 170));
             }
@@ -233,21 +234,21 @@ impl Github {
             let mut color = Color::rgb(140, 150, 170);
             let (mark, text): (&str, String) = match run.state() {
                 RunState::Error => ("?", run.error.clone()),
-                RunState::Loading => ("…", "загрузка".into()),
-                RunState::Neutral if run.status == "none" => ("–", "нет запусков".into()),
+                RunState::Loading => ("…", tr!("github.row.loading").into()),
+                RunState::Neutral if run.status == "none" => ("–", tr!("github.no_runs").into()),
                 RunState::Neutral => ("–", run.conclusion.clone()),
                 RunState::Passed => {
                     color = Color::rgb(60, 190, 100);
-                    ("✓", "passed".into())
+                    ("✓", tr!("github.row.passed").into())
                 }
                 RunState::Failed => {
                     color = Color::rgb(230, 70, 60);
                     failing += 1;
-                    ("✗", "failed".into())
+                    ("✗", tr!("github.row.failed").into())
                 }
                 RunState::Running => {
                     color = Color::rgb(230, 180, 50);
-                    ("●", "running".into())
+                    ("●", tr!("github.row.running").into())
                 }
             };
             c.fill_round_rect(6.0, y, 148.0, 22.0, 4.0, Color::rgb(24, 30, 40));
@@ -263,10 +264,13 @@ impl Github {
 
     fn status(&self, failing: usize) -> String {
         if failing > 0 {
-            return format!("упавших: {failing} из {}", self.repos.len());
+            return tr!("github.status.failing", failing = failing, total = self.repos.len());
         }
-        let every = if self.interval() >= 120 { format!("{} мин", self.interval() / 60) } else { "минуту".to_string() };
-        format!("{} репоз., обновление раз в {every}", self.repos.len())
+        if self.interval() >= 120 {
+            trn!("github.status.every_minutes", self.repos.len(), min = self.interval() / 60)
+        } else {
+            trn!("github.status.every_minute", self.repos.len())
+        }
     }
 }
 
@@ -333,7 +337,7 @@ impl LiveMode for Github {
         "GitHub Actions"
     }
     fn subtitle(&self) -> &'static str {
-        "последние запуски CI по репозиториям"
+        tr!("github.subtitle")
     }
     fn icon(&self) -> &'static str {
         "branch"
@@ -391,7 +395,7 @@ impl LiveMode for Github {
                     self.add_error = None;
                     self.save_repos(cx);
                 }
-                Err(e) => self.add_error = Some(e.to_string()),
+                Err(key) => self.add_error = Some(tr!(key).to_string()),
             },
             ModeCommand::GithubRemove(repo) => {
                 let before = self.repos.len();

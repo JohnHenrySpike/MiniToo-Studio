@@ -44,9 +44,9 @@ pub fn show(ui: &mut Ui, title: &str) {
     pixel::paint_text(&painter, pos2((rect.center().x - size.x / 2.0).round(), (rect.center().y - size.y / 2.0).round()), title, &st, p.text_dim);
 
     let keys = [
-        ("close", "Закрыть", Action::Close),
-        if max { ("win-restore", "Восстановить", Action::Maximize) } else { ("win-max", "Развернуть", Action::Maximize) },
-        ("win-min", "Свернуть", Action::Minimize),
+        ("close", tr!("titlebar.close"), Action::Close),
+        if max { ("win-restore", tr!("titlebar.restore"), Action::Maximize) } else { ("win-max", tr!("titlebar.maximize"), Action::Maximize) },
+        ("win-min", tr!("titlebar.minimize"), Action::Minimize),
     ];
     let y = (rect.center().y - KEY.y / 2.0 + 1.0).round();
     let mut x = rect.right() - 10.0 - KEY.x;

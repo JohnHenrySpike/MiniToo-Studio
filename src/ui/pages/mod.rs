@@ -60,12 +60,13 @@ pub fn scroll_page(ui: &mut Ui, id: &str, max_width: Option<f32>, add: impl FnOn
     });
 }
 
-/// Opens a file dialog on another thread; `then` gets the chosen paths.
+/// Opens a file dialog on another thread; `then` gets the chosen paths. Filter names are catalog
+/// keys (a text that is not a key is shown as it is).
 pub fn pick_files(title: &'static str, filters: &'static [(&'static str, &'static [&'static str])], multiple: bool, then: impl FnOnce(Vec<PathBuf>) + Send + 'static) {
     std::thread::spawn(move || {
         let mut d = rfd::FileDialog::new().set_title(title);
         for (name, ext) in filters {
-            d = d.add_filter(*name, ext);
+            d = d.add_filter(tr!(*name), ext);
         }
         let files = if multiple { d.pick_files().unwrap_or_default() } else { d.pick_file().into_iter().collect() };
         if !files.is_empty() {
@@ -82,7 +83,8 @@ pub fn pick_folder(title: &'static str, then: impl FnOnce(PathBuf) + Send + 'sta
     });
 }
 
+/// Image file filters for [`pick_files`] (names are catalog keys).
 pub const IMAGE_FILTERS: &[(&str, &[&str])] = &[
-    ("Изображения", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "jxl", "heic", "tif", "tiff"]),
-    ("Все файлы", &["*"]),
+    ("ui.files.images", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "jxl", "heic", "tif", "tiff"]),
+    ("ui.files.all", &["*"]),
 ];

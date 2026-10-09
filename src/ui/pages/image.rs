@@ -25,17 +25,17 @@ fn header_subtitle(src: Option<&SourceImage>, frames: usize) -> String {
         Some(s) => {
             let mut t = format!("{}  ·  {}×{}", s.name, s.width, s.height);
             if frames > 1 {
-                t.push_str(&format!("  ·  {frames} кадров"));
+                t.push_str(&format!("  ·  {}", trn!("image.frames", frames)));
             }
             t
         }
-        None => "картинка или GIF на весь экран колонки".into(),
+        None => tr!("image.subtitle_empty").into(),
     }
 }
 
 fn open_dialog(cx: &Cx) {
     let core = cx.core.clone();
-    pick_files("Выберите изображение", IMAGE_FILTERS, true, move |files| core.send(Command::OpenFiles(files)));
+    pick_files(tr!("image.open_dialog_title"), IMAGE_FILTERS, true, move |files| core.send(Command::OpenFiles(files)));
 }
 
 /// Frame index of a source animation at the current time (per-frame delays).
@@ -90,9 +90,9 @@ fn editor(ui: &mut Ui, cx: &mut Cx, rect: Rect) {
         }
     } else {
         let big = PixStyle::new(12).zoom(2);
-        let line = "Перетащите сюда картинку или GIF";
+        let line = tr!("image.drop_here");
         let ts = big.measure(line);
-        let key = Key::new("Выбрать файл…").icon("open").accent(true);
+        let key = Key::new(tr!("image.choose_file")).icon("open").accent(true);
         let ks = key.size(ui);
         let h = 60.0 + 14.0 + ts.y + 14.0 + ks.y;
         let top = rect.center().y - h / 2.0;
@@ -151,13 +151,13 @@ impl Thumb<'_> {
                 t.push_str(&format!("  ·  {}×{}", i.width, i.height));
             }
             if i.frames > 1 {
-                t.push_str(&format!("  ·  {} кадров", i.frames));
+                t.push_str(&format!("  ·  {}", trn!("image.frames", i.frames)));
             }
             if i.sent > 0 {
-                t.push_str(&format!("\nотправлено: {}", i.sent));
+                t.push_str(&format!("\n{}", tr!("image.thumb.sent", count = i.sent)));
             }
         }
-        t.push_str("\nщелчок — открыть, двойной — отправить");
+        t.push_str(&format!("\n{}", tr!("image.thumb.click_hint")));
         t
     }
 }
@@ -168,7 +168,7 @@ fn folder_name(p: &std::path::Path) -> String {
 
 fn choose_folder(cx: &Cx) {
     let core = cx.core.clone();
-    pick_folder("Папка с картинками", move |dir| {
+    pick_folder(tr!("image.folder_dialog_title"), move |dir| {
         core.send(Command::SetFolder(Some(dir)));
         core.send(Command::GalleryFilter(GalleryFilter::Folder));
     });
@@ -193,18 +193,18 @@ fn gallery(ui: &mut Ui, cx: &mut Cx, st: &mut State, rect: Rect) {
     area(ui, inner, |ui| {
         ui.spacing_mut().item_spacing = vec2(2.0, 8.0);
         w::row(ui, 30.0, 2.0, |ui| {
-            w::pixel_text(ui, "Галерея", PixStyle::new(12), p.text);
+            w::pixel_text(ui, tr!("image.gallery.title"), PixStyle::new(12), p.text);
             ui.add_space(10.0);
-            let all = format!("Все  {}", img.gallery.len());
-            if Key::new(&all).flat().checked(img.filter == GalleryFilter::All).tip("Всё, что вы открывали и отправляли").show(ui).clicked() {
+            let all = tr!("image.gallery.all", count = img.gallery.len());
+            if Key::new(&all).flat().checked(img.filter == GalleryFilter::All).tip(tr!("image.gallery.all_tip")).show(ui).clicked() {
                 cx.send(Command::GalleryFilter(GalleryFilter::All));
             }
-            let fav = if favorites > 0 { format!("Избранное  {favorites}") } else { "Избранное".into() };
+            let fav = if favorites > 0 { tr!("image.gallery.favorites_count", count = favorites) } else { tr!("image.gallery.favorites").into() };
             if Key::new(&fav).flat().checked(img.filter == GalleryFilter::Favorites).show(ui).clicked() {
                 cx.send(Command::GalleryFilter(GalleryFilter::Favorites));
             }
-            let folder_label = img.folder.as_deref().map(folder_name).unwrap_or_else(|| "Папка…".into());
-            let tip_text = img.folder.as_ref().map(|f| f.display().to_string()).unwrap_or_else(|| "Показать картинки из своей папки".into());
+            let folder_label = img.folder.as_deref().map(folder_name).unwrap_or_else(|| tr!("image.gallery.folder").into());
+            let tip_text = img.folder.as_ref().map(|f| f.display().to_string()).unwrap_or_else(|| tr!("image.gallery.folder_tip").into());
             let fk = Key::new(&folder_label).flat().icon("open").checked(folder_view).tip(&tip_text);
             let fk = if fk.size(ui).x > 180.0 { fk.width(180.0) } else { fk };
             if fk.show(ui).clicked() {
@@ -215,19 +215,19 @@ fn gallery(ui: &mut Ui, cx: &mut Cx, st: &mut State, rect: Rect) {
                 }
             }
             w::right(ui, |ui| {
-                let (icon, tip_t) = if st.expanded { ("down", "Свернуть в полосу") } else { ("up", "Развернуть сеткой") };
+                let (icon, tip_t) = if st.expanded { ("down", tr!("image.gallery.collapse")) } else { ("up", tr!("image.gallery.expand")) };
                 if Key::icon_only(icon).flat().tip(tip_t).show(ui).clicked() {
                     st.expanded = !st.expanded;
                 }
                 if folder_view && img.folder.is_some() {
-                    if Key::icon_only("close").flat().tip("Убрать папку").show(ui).clicked() {
+                    if Key::icon_only("close").flat().tip(tr!("image.gallery.remove_folder")).show(ui).clicked() {
                         cx.send(Command::SetFolder(None));
                         cx.send(Command::GalleryFilter(GalleryFilter::All));
                     }
-                    if Key::icon_only("open").flat().tip("Выбрать другую папку…").show(ui).clicked() {
+                    if Key::icon_only("open").flat().tip(tr!("image.gallery.other_folder")).show(ui).clicked() {
                         choose_folder(cx);
                     }
-                    if Key::icon_only("refresh").flat().tip("Перечитать папку").show(ui).clicked() {
+                    if Key::icon_only("refresh").flat().tip(tr!("image.gallery.rescan")).show(ui).clicked() {
                         cx.send(Command::RescanFolder);
                     }
                 }
@@ -242,16 +242,14 @@ fn gallery(ui: &mut Ui, cx: &mut Cx, st: &mut State, rect: Rect) {
         let list_rect = ui.available_rect_before_wrap();
         if thumbs.is_empty() {
             let text = match img.filter {
-                GalleryFilter::Favorites => "Отметьте картинки звёздочкой — они соберутся здесь.",
-                GalleryFilter::Folder if img.folder.is_none() => "Папка не выбрана.",
-                GalleryFilter::Folder => "В папке нет картинок.",
-                GalleryFilter::All => {
-                    "Здесь появятся картинки, которые вы открываете и отправляете. Можно перетащить сюда файлы или целую папку."
-                }
+                GalleryFilter::Favorites => tr!("image.gallery.empty_favorites"),
+                GalleryFilter::Folder if img.folder.is_none() => tr!("image.gallery.no_folder"),
+                GalleryFilter::Folder => tr!("image.gallery.folder_empty"),
+                GalleryFilter::All => tr!("image.gallery.empty_all"),
             };
             let width = (list_rect.width() - 24.0).min(460.0);
             let g = w::galley_wrapped(ui, text, w::font(13.0), p.text_dim, width);
-            let key = Key::new("Выбрать папку…").icon("open");
+            let key = Key::new(tr!("image.gallery.choose_folder")).icon("open");
             let ks = key.size(ui);
             let h = g.size().y + if folder_view { 8.0 + ks.y } else { 0.0 };
             let top = list_rect.center().y - h / 2.0;
@@ -359,7 +357,7 @@ fn thumb_cell(ui: &mut Ui, cx: &mut Cx, st: &mut State, t: &Thumb, cell: Rect, f
     if let Thumb::Item(i) = t {
         if i.favorite || hovered {
             let r = Rect::from_min_size(frame_min + vec2(bezel + 3.0, bezel + 3.0), vec2(22.0, 22.0));
-            let tip = if i.favorite { "Убрать из избранного" } else { "В избранное" };
+            let tip = if i.favorite { tr!("image.thumb.unfavorite") } else { tr!("image.thumb.favorite") };
             if w::mini_key(ui, r, "star", i.favorite, tip).clicked() {
                 cx.send(Command::GalleryFavorite(i.id.clone(), !i.favorite));
                 clicked_key = true;
@@ -367,7 +365,7 @@ fn thumb_cell(ui: &mut Ui, cx: &mut Cx, st: &mut State, t: &Thumb, cell: Rect, f
         }
         if hovered {
             let r = Rect::from_min_size(pos2(frame_rect.right() - bezel - 25.0, frame_rect.top() + bezel + 3.0), vec2(22.0, 22.0));
-            if w::mini_key(ui, r, "trash", false, "Убрать из галереи").clicked() {
+            if w::mini_key(ui, r, "trash", false, tr!("image.thumb.remove")).clicked() {
                 cx.send(Command::GalleryRemove(i.id.clone()));
                 clicked_key = true;
             }
@@ -377,14 +375,14 @@ fn thumb_cell(ui: &mut Ui, cx: &mut Cx, st: &mut State, t: &Thumb, cell: Rect, f
         let y = frame_rect.bottom() - bezel - 25.0;
         let mut x = frame_rect.right() - bezel - 25.0;
         let r = Rect::from_min_size(pos2(x, y), vec2(22.0, 22.0));
-        if w::mini_key(ui, r, "send", true, "Отправить на колонку").clicked() {
+        if w::mini_key(ui, r, "send", true, tr!("image.send")).clicked() {
             cx.send(t.send());
             clicked_key = true;
         }
         if grid {
             x -= 26.0;
             let r = Rect::from_min_size(pos2(x, y), vec2(22.0, 22.0));
-            if w::mini_key(ui, r, "crop", false, "Открыть в редакторе").clicked() {
+            if w::mini_key(ui, r, "crop", false, tr!("image.thumb.open_editor")).clicked() {
                 cx.send(t.open());
                 st.expanded = false;
                 clicked_key = true;
@@ -415,7 +413,7 @@ fn bottom_height(ui: &Ui, cx: &Cx, width: f32) -> f32 {
     let hint = w::galley_wrapped(ui, fit_hint(img.fit), w::font(12.0), Color32::WHITE, col_w).size().y;
     let mut col = 14.0 + 10.0 + 33.0 + 10.0 + 28.0 + 10.0 + hint + 10.0 + 46.0;
     if img.source_frames > 92 {
-        col += 10.0 + w::galley_wrapped(ui, WARN_92, w::font(13.0), Color32::WHITE, col_w).size().y;
+        col += 10.0 + w::galley_wrapped(ui, tr!("image.warn_92"), w::font(13.0), Color32::WHITE, col_w).size().y;
     }
     if let Some(e) = &img.error {
         col += 10.0 + w::galley_wrapped(ui, e, w::font(13.0), Color32::WHITE, col_w).size().y;
@@ -423,13 +421,11 @@ fn bottom_height(ui: &Ui, cx: &Cx, width: f32) -> f32 {
     16.0 + col.max(fs.y) + 19.0
 }
 
-const WARN_92: &str = "Колонка показывает до 92 кадров — лишние будут равномерно прорежены, длительность сохранится.";
-
 fn fit_hint(fit: Fit) -> &'static str {
     match fit {
-        Fit::Crop => "Тяните рамку и её углы, колесо мыши — масштаб, двойной щелчок — сброс. Пропорции экрана 5:4.",
-        Fit::Fit => "Картинка целиком, поля заполняются чёрным.",
-        Fit::Stretch => "Картинка растягивается на весь экран без сохранения пропорций.",
+        Fit::Crop => tr!("image.fit.crop_hint"),
+        Fit::Fit => tr!("image.fit.fit_hint"),
+        Fit::Stretch => tr!("image.fit.stretch_hint"),
     }
 }
 
@@ -449,34 +445,34 @@ fn bottom(ui: &mut Ui, cx: &mut Cx, rect: Rect) {
     let col = Rect::from_min_max(pos2(inner.left() + fs.x + 20.0, inner.top()), inner.max);
     area(ui, col, |ui| {
         ui.spacing_mut().item_spacing = vec2(8.0, 10.0);
-        w::pixel_text(ui, "Так будет на колонке", PixStyle::new(12), p.text);
+        w::pixel_text(ui, tr!("image.preview_title"), PixStyle::new(12), p.text);
         let cur = match img.fit {
             Fit::Crop => 0,
             Fit::Fit => 1,
             Fit::Stretch => 2,
         };
-        if let Some(i) = w::tabs(ui, &[("Кадрировать", None), ("Вписать", None), ("Растянуть", None)], cur) {
+        if let Some(i) = w::tabs(ui, &[(tr!("image.fit.crop"), None), (tr!("image.fit.fit"), None), (tr!("image.fit.stretch"), None)], cur) {
             cx.send(Command::SetFit(Fit::from_i64(i as i64)));
         }
         w::row(ui, 28.0, 14.0, |ui| {
-            let r = w::checkbox(ui, img.pixel_art, "Пиксель-арт", true);
-            let r = w::tip(r, "Масштабировать без сглаживания — для пиксельной графики");
+            let r = w::checkbox(ui, img.pixel_art, tr!("image.pixel_art"), true);
+            let r = w::tip(r, tr!("image.pixel_art_tip"));
             if r.clicked() {
                 cx.send(Command::SetPixelArt(!img.pixel_art));
             }
-            if img.fit == Fit::Crop && Key::new("Сбросить рамку").flat().icon("refresh").enabled(has).show(ui).clicked() {
+            if img.fit == Fit::Crop && Key::new(tr!("image.reset_crop")).flat().icon("refresh").enabled(has).show(ui).clicked() {
                 cx.send(Command::ResetCrop);
             }
         });
         w::para(ui, fit_hint(img.fit), w::font(12.0), p.text_dim);
         if img.source_frames > 92 {
-            w::para(ui, WARN_92, w::font(13.0), p.warn);
+            w::para(ui, tr!("image.warn_92"), w::font(13.0), p.warn);
         }
         if let Some(e) = &img.error {
             w::para(ui, e, w::font(13.0), p.danger);
         }
     });
-    let key = Key::new("Отправить на колонку").icon("send").accent(true).height(46.0).pad(22.0).enabled(has);
+    let key = Key::new(tr!("image.send")).icon("send").accent(true).height(46.0).pad(22.0).enabled(has);
     let ks = key.size(ui);
     let kr = Rect::from_min_size(inner.max - ks, ks);
     if key.show_at(ui, kr).clicked() {
@@ -491,8 +487,8 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     let frames = img.source.as_ref().map(|s| s.frames.len().max(img.source_frames)).unwrap_or(0);
     let sub = header_subtitle(img.source.as_ref(), if img.source_frames > 0 { img.source_frames } else { frames });
     let header_h = area(ui, full, |ui| {
-        w::page_header(ui, "Изображение", &sub, |ui| {
-            if Key::new("Открыть…").icon("open").show(ui).clicked() {
+        w::page_header(ui, tr!("image.title"), &sub, |ui| {
+            if Key::new(tr!("image.open")).icon("open").show(ui).clicked() {
                 open_dialog(cx);
             }
         });

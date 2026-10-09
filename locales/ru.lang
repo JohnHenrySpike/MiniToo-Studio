@@ -1,0 +1,691 @@
+# MiniToo Studio — русский.
+#
+# Чтобы перевести MiniToo Studio на свой язык, скопируйте en.lang в
+# ~/.config/minitoo-studio/locales/<код>.lang (например, uk.lang), поменяйте @name и тексты и
+# выберите язык в Настройках. Подробнее — README.md рядом с этим файлом.
+
+@name = Русский
+@plural = ru
+
+# ---------------------------------------------------------------- даты и время
+
+format.hours = 24
+format.date = %d.%m.%Y
+date.long = %A, %-d %B
+date.short = %a, %-d %B
+date.months = января, февраля, марта, апреля, мая, июня, июля, августа, сентября, октября, ноября, декабря
+date.months.short = янв, фев, мар, апр, мая, июн, июл, авг, сен, окт, ноя, дек
+date.weekdays = понедельник, вторник, среда, четверг, пятница, суббота, воскресенье
+date.weekdays.short = пн, вт, ср, чт, пт, сб, вс
+time.am = AM
+time.pm = PM
+
+# ---------------------------------------------------------------- страница «Настройки»
+settings.title = Настройки
+settings.subtitle = связь с колонкой, передача и приложение
+settings.group.look = Оформление
+settings.theme.beige = Бежевая
+settings.theme.night = Ночная
+settings.theme.hint = Цвета корпуса MiniToo или тёмный стол для вечера. Сама колонка справа всегда бежевая.
+settings.group.language = Язык и форматы
+settings.language = Язык
+settings.language.system = Системный ({language})
+settings.language.folder = Папка переводов
+settings.language.folder_tip = Открывает папку для своих переводов; en.lang.template в ней — английский текст, с которого удобно начать
+settings.language.hint = Свой перевод: скопируйте en.lang.template из {folder} в <код>.lang (например, uk.lang), переведите строки после «=» и выберите язык выше.
+settings.time = Время
+settings.format.auto = Как в языке
+settings.time.24 = 24 часа
+settings.time.12 = 12 часов
+settings.date = Дата
+settings.date.auto = Как в языке ({example})
+settings.date.custom = Свой формат…
+settings.date.pattern_hint = %d день, %m месяц, %Y год, %y две цифры, %B месяц словом, %b кратко, %A день недели, %a кратко. %-d и %-m — без ведущего нуля.
+settings.group.device = Колонка
+settings.mac = MAC-адрес
+settings.mac.find = Найти
+settings.mac.searching = Поиск…
+settings.mac.unnamed = без имени
+settings.channel = Канал RFCOMM
+settings.auto_connect = Подключаться при запуске
+settings.keepalive = Не давать засыпать
+settings.keepalive.hint = секунд между служебными пингами (0 — выключено). Держит соединение активным, чтобы колонка не отключалась.
+settings.group.transfer = Передача изображения
+settings.chunk_delay = Пауза между пакетами
+settings.chunk_delay.hint = мс. Меньше — быстрее (особенно трансляция экрана), но колонка может не успевать и запрашивать пакеты повторно.
+settings.zstd = Сжатие zstd
+settings.zstd.hint = уровень для картинок и анимаций (19 — компактно). Трансляция экрана всегда использует быстрый уровень.
+settings.group.app = Приложение
+settings.close_to_tray = Сворачивать в трей при закрытии окна
+settings.start_hidden = Запускаться свёрнутым в трей
+settings.cli.prefix = "Командная строка: "
+settings.cli.send = --send файл.gif [--fit crop|fit|stretch]
+settings.cli.debug = " (журнал и диагностика протокола)."
+
+# ---------------------------------------------------------------- режим «Часы и погода» (колонка)
+clock.title = Часы и погода
+clock.subtitle = время, дата, Open-Meteo
+clock.status.no_city = укажите город для погоды
+clock.status.weather = {city}: {temp}°, {sky}, обновлено {time}
+clock.status.weather_error = погода: {error}
+clock.error.http = ошибка HTTP {status}
+clock.error.reply = неожиданный ответ
+clock.error.timeout = таймаут
+clock.error.connect = нет соединения
+clock.pixel.date_ampm = {ampm} · {date}
+clock.weather.clear = ясно
+clock.weather.partly_cloudy = малооблачно
+clock.weather.overcast = пасмурно
+clock.weather.fog = туман
+clock.weather.drizzle = морось
+clock.weather.rain = дождь
+clock.weather.snow = снег
+clock.weather.showers = ливень
+clock.weather.snowfall = снегопад
+clock.weather.thunderstorm = гроза
+
+
+# ================================================================ окно, навигация, трей, платформа
+
+# ---------------------------------------------------------------- navigation (src/ui/nav.rs)
+nav.image = Изображение
+nav.image_sub = картинки и GIF
+nav.screen = Экран
+nav.screen_sub = трансляция области
+nav.modes = Режимы
+nav.modes_sub = часы, музыка, система
+nav.claude = Claude
+nav.claude_sub = статус агентов
+nav.device = Колонка
+nav.device_sub = звук, заряд, встроенное
+nav.settings = Настройки
+nav.settings_sub = связь и приложение
+nav.on_device = Сейчас на колонке
+nav.theme_beige = Бежевая тема
+nav.theme_dark = Тёмная тема
+
+# ---------------------------------------------------------------- title bar (src/ui/titlebar.rs)
+titlebar.close = Закрыть
+titlebar.restore = Восстановить
+titlebar.maximize = Развернуть
+titlebar.minimize = Свернуть
+
+# ---------------------------------------------------------------- device panel (src/ui/device_panel.rs)
+panel.screen_placeholder = здесь будет экран колонки
+panel.screen_off = Выключить экран колонки
+panel.screen_on = Включить экран колонки
+panel.volume_down = Тише
+panel.volume_up = Громче
+panel.prev_track = Предыдущий трек
+panel.play_pause = Пауза / воспроизведение
+panel.next_track = Следующий трек
+panel.connect = Подключить колонку
+panel.disconnect = Отключить колонку
+panel.conn.disconnected = Нет связи
+panel.conn.connecting = Подключение…
+panel.conn.connected = Подключена
+panel.on_screen = На экране: {what}
+panel.on_screen_alert = На экране: {what}  •  тревога Claude
+panel.brightness = Яркость экрана
+panel.volume = Громкость колонки
+panel.log_show = Журнал
+panel.log_show_count = Журнал  ({count})
+panel.log_hide = Скрыть журнал
+panel.log_hide_count = Скрыть журнал  ({count})
+panel.log_clear = Очистить журнал
+
+# ---------------------------------------------------------------- file dialogs (src/ui/pages/mod.rs)
+ui.files.images = Изображения
+ui.files.all = Все файлы
+
+# ---------------------------------------------------------------- tray (src/platform/tray.rs)
+tray.show = Показать окно
+tray.claude_mode = Режим Claude
+tray.stop_stream = Остановить трансляцию экрана
+tray.quit = Выход
+tray.unavailable = трей недоступен: {error}
+
+# ---------------------------------------------------------------- notifications (src/platform/notifications.rs)
+notify.unsupported = мониторинг уведомлений недоступен на этой платформе
+notify.no_session_bus = сессионная шина D-Bus недоступна: {error}
+notify.auth_failed = авторизация на шине D-Bus: {error}
+notify.bus_error = шина D-Bus: {error}
+notify.interrupted = мониторинг уведомлений прерван: {error}
+notify.monitor_failed = BecomeMonitor не удался: {error}
+notify.bad_message = повреждённое сообщение
+notify.no_bus_address = DBUS_SESSION_BUS_ADDRESS не задан
+
+# ---------------------------------------------------------------- BlueZ (src/platform/bluez.rs)
+bluez.unsupported = недоступно на этой платформе
+bluez.bus_timeout = системная шина D-Bus не отвечает
+bluez.bus_unavailable = системная шина D-Bus недоступна: {error}
+bluez.not_running = служба BlueZ не запущена
+bluez.call_timeout = {call}: нет ответа за {secs} с
+bluez.bad_reply = ответ BlueZ не разобран: {error}
+bluez.device_not_found = колонка {mac} не найдена в BlueZ (её нужно сначала сопрячь)
+bluez.connect_failed = не удалось подключить: {error}
+bluez.no_adapter = Bluetooth-адаптер не найден
+bluez.powered_off = Bluetooth выключен
+bluez.discovery_failed = поиск не запустился: {error}
+
+# ---------------------------------------------------------------- screen capture (src/platform/capture.rs)
+capture.cancelled = выбор источника отменён
+capture.portal_error = портал вернул ошибку
+capture.portal_unavailable = xdg-desktop-portal ScreenCast недоступен: {error}
+capture.no_stream = портал не вернул поток
+capture.session_closed = сеанс захвата закрыт
+capture.pw_start_failed = не удалось запустить поток PipeWire
+capture.pw_connect_failed = не удалось подключиться к PipeWire
+capture.pw_closed = поток PipeWire закрыт
+capture.pw_format = PipeWire: формат
+capture.start_failed = не удалось запустить захват экрана
+capture.no_monitors = нет мониторов
+capture.unavailable = захват экрана недоступен: {error}
+capture.failed = захват экрана не удался: {error}
+capture.systemctl_code = systemctl: код {code}
+capture.restart_unsupported = недоступно
+
+# ---------------------------------------------------------------- screensaver (src/platform/screensaver.rs)
+platform.screensaver.listening = ScreenSaver.ActiveChanged: слушаю как {name}
+
+
+# ================================================================ страницы «Изображение», «Экран», «Колонка»
+
+# ---------------------------------------------------------------- src/ui/pages/device.rs
+device_page.title = Колонка
+device_page.subtitle = что умеет и что сообщает MiniToo
+device_page.subtitle_disconnected = колонка не подключена — команды уйдут после подключения
+device_page.send = Отправить
+device_page.battery.plate = батарея
+device_page.battery.hint_known = Сообщает профиль Hands-Free, через BlueZ. Обновляется раз в 30 секунд.
+device_page.battery.hint_unknown = По протоколу приложения колонка заряд не сообщает. Его передаёт профиль Hands-Free, когда колонка подключена к компьютеру как аудиоустройство.
+device_page.battery.connect_audio = Подключить как аудио
+device_page.battery.connect_audio_tip = Колонка станет звуковым выходом компьютера (A2DP / Hands-Free)
+device_page.screen.plate = экран
+device_page.screen.off = Выключить
+device_page.screen.on = Включить
+device_page.screen.sync_clock = Синхронизировать часы
+device_page.screen.sync_clock_tip = Установить на колонке время компьютера (для встроенных часов колонки)
+device_page.screen.brightness_hint = Яркость — ползунком под колонкой справа.
+device_page.sound.plate = звук
+device_page.sound.prev = Предыдущий трек
+device_page.sound.pause = Пауза
+device_page.sound.play = Играть
+device_page.sound.next = Следующий трек
+device_page.sound.player_note = плеер на устройстве, которое играет через колонку
+device_page.sound.hint_audio = Кнопки работают как клавиши на колонке: передают «играть / пауза / трек» плееру компьютера. Если плеер не запущен, ничего не произойдёт.
+device_page.sound.hint_no_audio = Колонка сейчас не подключена как аудио, поэтому кнопкам плеера некому передавать команды.
+device_page.lock.title = Когда экран компьютера заблокирован
+device_page.lock.show_clock = Показывать часы и приглушать яркость
+device_page.lock.brightness = Яркость:
+device_page.lock.hint = Режим не меняется: после разблокировки колонка вернёт прежнюю картинку и яркость. Тревоги Claude и уведомления показываются и поверх часов.
+device_page.lock.hint_locked = Сейчас экран заблокирован. Режим не меняется: после разблокировки колонка вернёт прежнюю картинку и яркость. Тревоги Claude и уведомления показываются и поверх часов.
+device_page.builtin.title = Встроенные экраны колонки
+device_page.builtin.cosmonaut = Космонавт
+device_page.builtin.gallery = Галерея
+device_page.builtin.noise_meter = Шумомер
+device_page.builtin.tetris = Тетрис
+device_page.builtin.game2 = Игра 2
+device_page.builtin.game3 = Игра 3
+device_page.builtin.exit_game = Выйти из игры
+device_page.builtin.scoreboard = Табло:
+device_page.builtin.blue = синие
+device_page.builtin.red = красные
+device_page.builtin.show = Показать
+device_page.builtin.hint = Из встроенного экрана колонку выводит кнопка на ней самой или любая отправка из приложения.
+device_page.notice.title = Уведомление на колонке
+device_page.notice.default_text = Привет!
+device_page.notice.icon = Значок
+device_page.notice.icon_tip = Встроенное уведомление колонки: только значок выбранного приложения
+device_page.notice.text_hint = Текст уведомления
+device_page.notice.hint = Встроенное уведомление колонки умеет показывать только значок, текст прошивка не выводит. Поэтому «Отправить» рисует карточку с текстом в приложении и держит её на экране {secs} с, как уведомления рабочего стола.
+device_page.info.title = Что сообщает колонка
+device_page.info.heartbeat = Пульс колонки
+device_page.diag.title = Диагностика
+device_page.diag.hex_hint = hex: <команда> <аргументы>, например 09
+device_page.diag.hint = Ответы — в журнале справа и на http://127.0.0.1:{port}/device. Не отправляйте команды сна 0x40, 0xa3, 0xa4, 0xad, 0xae — они зависают колонку до выключения питания.
+
+# ---------------------------------------------------------------- src/ui/pages/image.rs
+image.title = Изображение
+image.open = Открыть…
+image.subtitle_empty = картинка или GIF на весь экран колонки
+image.frames[one] = {n} кадр
+image.frames[few] = {n} кадра
+image.frames[many] = {n} кадров
+image.open_dialog_title = Выберите изображение
+image.folder_dialog_title = Папка с картинками
+image.drop_here = Перетащите сюда картинку или GIF
+image.choose_file = Выбрать файл…
+image.send = Отправить на колонку
+image.thumb.sent = отправлено: {count}
+image.thumb.click_hint = щелчок — открыть, двойной — отправить
+image.thumb.favorite = В избранное
+image.thumb.unfavorite = Убрать из избранного
+image.thumb.remove = Убрать из галереи
+image.thumb.open_editor = Открыть в редакторе
+image.gallery.title = Галерея
+image.gallery.all = Все  {count}
+image.gallery.all_tip = Всё, что вы открывали и отправляли
+image.gallery.favorites = Избранное
+image.gallery.favorites_count = Избранное  {count}
+image.gallery.folder = Папка…
+image.gallery.folder_tip = Показать картинки из своей папки
+image.gallery.collapse = Свернуть в полосу
+image.gallery.expand = Развернуть сеткой
+image.gallery.remove_folder = Убрать папку
+image.gallery.other_folder = Выбрать другую папку…
+image.gallery.rescan = Перечитать папку
+image.gallery.choose_folder = Выбрать папку…
+image.gallery.empty_favorites = Отметьте картинки звёздочкой — они соберутся здесь.
+image.gallery.no_folder = Папка не выбрана.
+image.gallery.folder_empty = В папке нет картинок.
+image.gallery.empty_all = Здесь появятся картинки, которые вы открываете и отправляете. Можно перетащить сюда файлы или целую папку.
+image.warn_92 = Колонка показывает до 92 кадров — лишние будут равномерно прорежены, длительность сохранится.
+image.preview_title = Так будет на колонке
+image.fit.crop = Кадрировать
+image.fit.fit = Вписать
+image.fit.stretch = Растянуть
+image.fit.crop_hint = Тяните рамку и её углы, колесо мыши — масштаб, двойной щелчок — сброс. Пропорции экрана 5:4.
+image.fit.fit_hint = Картинка целиком, поля заполняются чёрным.
+image.fit.stretch_hint = Картинка растягивается на весь экран без сохранения пропорций.
+image.pixel_art = Пиксель-арт
+image.pixel_art_tip = Масштабировать без сглаживания — для пиксельной графики
+image.reset_crop = Сбросить рамку
+
+# ---------------------------------------------------------------- src/ui/pages/screen.rs
+screen.title = Экран
+screen.subtitle = трансляция области экрана или окна
+screen.subtitle_source = источник {width}×{height} — выделите область рамкой
+screen.other_source = Другой источник…
+screen.other_source_tip = Снова показать диалог выбора экрана или окна
+screen.stop_capture = Остановить захват
+screen.waiting = Ожидание выбора…
+screen.start_capture = Начать захват
+screen.choose_screen = Выбрать экран…
+screen.stale.title = Портал захвата экрана устарел
+screen.stale.message = После обновления системы служба портала работает со старыми библиотеками, и окно выбора экрана не открывается. Её нужно перезапустить ({units}).
+screen.stale.restart = Перезапустить
+screen.canvas.selecting_title = Выберите экран или окно…
+screen.canvas.idle_title = Захват не запущен
+screen.canvas.selecting_text = KDE показывает диалог выбора — он может открыться за этим окном.
+screen.canvas.idle_text = Нажмите «{start}». KDE спросит, какой экран или окно показать; выбор запомнится. Затем выделите область рамкой и нажмите «{stream}».
+screen.canvas.error = Ошибка захвата: {error}
+screen.stream = Транслировать
+screen.stop = Остановить
+screen.fps = Частота
+screen.fps_value = {v} к/с
+screen.crisp = Чёткие пиксели
+screen.crisp_tip = Без сглаживания при уменьшении — для пиксель-арта и мелкого текста
+screen.quality.label = Качество
+screen.quality.max = Максимум
+screen.quality.balance = Баланс
+screen.quality.speed = Скорость
+screen.quality.tip = «Баланс» и «Скорость» уменьшают цвет до RGB565/RGB444 — кадр меньше и приходит быстрее. Неизменный экран повторно не передаётся.
+screen.actual_fps = Фактически {fps} к/с
+screen.actual_fps_frame = Фактически {fps} к/с,  кадр {kb} КБ
+screen.paused = Пауза: на колонке тревога Claude или уведомление
+
+
+# ================================================================ страницы «Режимы» и «Claude»
+
+# ---------------------------------------------------------------- src/ui/pages/modes.rs
+modes.page.title = Режимы
+modes.page.subtitle = экраны, которые рисуются сами и обновляются на колонке
+modes.page.stop = Остановить
+modes.page.stop_tip = Перестать обновлять колонку (картинка останется)
+modes.rotation.title = Ротация
+modes.rotation.interval_value = {v} с
+modes.rotation.interval_tip = Сколько секунд показывать каждый режим
+modes.rotation.running = Ротация идёт
+modes.rotation.start = Запустить ротацию
+modes.rotation.stop_tip = Остановить ротацию — текущий режим останется на колонке
+modes.rotation.start_tip = Показывать отмеченные режимы по очереди
+modes.rotation.next_tip = Следующий режим сейчас
+modes.rotation.hint_none = Отметьте галочкой режимы, которые будут сменять друг друга на колонке.
+modes.rotation.hint_one = Отмечен один режим — он будет просто показан. Отметьте ещё, чтобы они сменялись.
+modes.rotation.hint_checked[one] = Отмечено режимов: {n}. Порядок — как в списке.
+modes.rotation.hint_checked[few] = Отмечено режимов: {n}. Порядок — как в списке.
+modes.rotation.hint_checked[many] = Отмечено режимов: {n}. Порядок — как в списке.
+modes.rotation.hint_one_running = Отмечен один режим — показывается без смены.
+modes.rotation.hint_paused = Пауза: поверх показывается уведомление или сигнал Claude.
+modes.rotation.hint_next = Дальше «{title}» через {time}
+modes.row.live_tip = Сейчас на колонке
+modes.row.rotation_remove = В ротации — убрать
+modes.row.rotation_add = Добавить в ротацию
+modes.list.overlays = ПОВЕРХ РЕЖИМОВ
+modes.notify.title = Уведомления
+modes.notify.status_on = включены, {sec} с
+modes.notify.status_off = выключены
+modes.card.on_device_rotating = На колонке, идёт ротация
+modes.card.on_device = Показывается на колонке
+modes.card.show_only = Показать только этот режим
+modes.card.show = Показать на колонке
+modes.card.hint_rotating = Идёт ротация: выбор одного режима её остановит.
+modes.card.hint_on_device_rotation = Колонка получает новый кадр, только когда картинка меняется. Ротация вернётся после перезапуска приложения.
+modes.card.hint_on_device_mode = Колонка получает новый кадр, только когда картинка меняется. Режим вернётся после перезапуска приложения.
+modes.card.hint_preview = Предпросмотр живой: так режим будет выглядеть на колонке.
+modes.clock.face = Циферблат
+modes.clock.face_sky = Небо
+modes.clock.face_neon = Неон
+modes.clock.face_pixels = Пиксели
+modes.clock.no_city = Город не выбран
+modes.clock.remove_weather = Убрать погоду
+modes.clock.search_other = Другой город…
+modes.clock.search_hint = Начните вводить название города…
+modes.clock.nothing_found = Ничего не найдено. Попробуйте по-русски или по-английски.
+modes.clock.weather_hint = Погода — Open-Meteo, без регистрации; обновляется раз в 15 минут.
+modes.player.none = Ни один плеер не запущен. Подойдёт любой с поддержкой MPRIS: браузер, Spotify, Elisa, VLC…
+modes.player.pause = Пауза
+modes.player.play = Играть
+modes.pomodoro.pause = Пауза
+modes.pomodoro.start = Старт
+modes.pomodoro.skip = Пропустить
+modes.pomodoro.reset = Сброс
+modes.pomodoro.work_min = Фокус, мин
+modes.pomodoro.break_min = Перерыв, мин
+modes.pomodoro.long_min = Длинный перерыв, мин
+modes.pomodoro.hint = Длинный перерыв — после каждого четвёртого помидора. Когда этап заканчивается, на колонке на несколько секунд появляется карточка, даже если показывается другой режим.
+modes.github.remove = Убрать
+modes.github.add = Добавить
+modes.github.repo_hint = owner/repo или ссылка на GitHub
+modes.github.examples = Например:
+modes.github.token_save = Сохранить
+modes.github.token_delete = Удалить
+modes.github.token_saved_hint = токен сохранён — введите новый, чтобы заменить
+modes.github.token_hint = токен GitHub (нужен для приватных репозиториев)
+modes.github.hint = Показывается последний запуск Actions в каждом репозитории. Без токена GitHub даёт 60 запросов в час, поэтому опрос раз в {mins} мин; с токеном — раз в минуту.
+modes.visualizer.style_peaks = С пиками
+modes.visualizer.style_mirrored = Зеркальные
+modes.visualizer.hint = Спектр того, что звучит на компьютере (монитор устройства вывода PipeWire). Это поток кадров: пока режим на колонке, она получает 5–8 кадров в секунду.
+modes.notify.enable = Показывать уведомления KDE на колонке
+modes.notify.duration = Показывать, секунд
+modes.notify.ignore = Не показывать от
+modes.notify.ignore_hint = приложения через запятую
+modes.notify.test = Показать тестовое
+modes.notify.hint = Карточка поверх любого режима, изображения или трансляции; затем на колонке снова то, что было.
+modes.notify.group = Уведомления рабочего стола
+modes.settings.group = Настройки
+modes.sysmon.hint = Загрузка процессора и видеокарты, температуры, память. Данные: /proc, датчики hwmon, nvidia-smi или sysfs AMD. Кадр раз в 2 секунды.
+modes.claudestats.hint = Считается по журналам Claude Code в ~/.claude/projects за сегодня: запросы, ответы и токены.
+
+# ---------------------------------------------------------------- src/ui/pages/claude.rs
+claude_page.page.subtitle = статус Claude Code на экране колонки
+claude_page.page.show_on_device = Показывать на колонке
+claude_page.ago.seconds = {n} с назад
+claude_page.ago.minutes = {n} мин назад
+claude_page.ago.hours = {n} ч назад
+claude_page.status.plate = статус
+claude_page.status.no_sessions = Активных сессий нет
+claude_page.status.sessions[one] = Сессий: {n}
+claude_page.status.sessions[few] = Сессий: {n}
+claude_page.status.sessions[many] = Сессий: {n}
+claude_page.status.interrupt = Тревога поверх картинки и трансляции
+claude_page.status.idle_alerts = “Ждёт ввода” после простоя — тоже тревога
+claude_page.status.alert_caption = Проект и вопрос на сцене «Ждёт вас»
+claude_page.status.alert_caption_tip = Например: «divoom — Разрешить Bash?». Если ждут несколько сессий, рядом с проектом будет «+N».
+claude_page.face.custom_file = свой файл: {file}
+claude_page.face.scene = сцена «{title}»
+claude_page.face.show_tip = Показать на колонке
+claude_page.face.custom_gif = Свой GIF…
+claude_page.face.reset_tip = Вернуть встроенные сцены
+claude_page.face.pick_title = GIF или изображение для статуса
+claude_page.face.scene_tip = «{title}» — нажмите, чтобы показать на колонке
+claude_page.face.set_remove = В наборе — убрать
+claude_page.face.set_add = Добавить в набор
+claude_page.faces.group = Анимации состояний
+claude_page.faces.hint = При каждой смене состояния показывается случайная сцена из отмеченных галочкой; если состояние долго не меняется — следующая через заданное время (кроме «Ждёт вас»). Свой GIF заменяет все сцены состояния.
+claude_page.faces.every = Менять сцену каждые
+claude_page.faces.every_off = нет
+claude_page.faces.every_value = {v} мин
+claude_page.sessions.group = Сессии
+claude_page.sessions.empty = Нет активных сессий. Запустите Claude Code — сессии появятся здесь.
+claude_page.sessions.no_hooks = Установите хуки ниже, чтобы Claude Code сообщал свой статус.
+claude_page.sessions.test = Проверить:
+claude_page.sessions.test_tip = На 10 секунд: колонка покажет сцену в любом режиме, затем вернётся к прежнему
+claude_page.sessions.clear = Очистить
+claude_page.hooks.group = Подключение к Claude Code
+claude_page.hooks.server = Сервер событий
+claude_page.hooks.listening = слушает; после смены порта переустановите хуки
+claude_page.hooks.port_busy = порт занят — выберите другой
+claude_page.hooks.hooks = Хуки
+claude_page.hooks.installed_in = установлены в {path}
+claude_page.hooks.not_installed = не установлены
+claude_page.hooks.hint = Кнопка добавит в {path} хуки SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop и SessionEnd (с резервной копией файла). Каждый хук — короткий curl на локальный порт; если приложение не запущено, он молча завершится и Claude не заметит.
+claude_page.hooks.install = Установить хуки
+claude_page.hooks.uninstall = Удалить хуки
+claude_page.hooks.copy_json = Скопировать JSON
+claude_page.hooks.copied = JSON скопирован в буфер обмена
+
+
+# ================================================================ живые режимы (экраны колонки)
+
+# ---------------------------------------------------------------- src/live/github.rs
+github.err.format = нужно owner/repo или ссылка на репозиторий
+github.err.duplicate = уже в списке
+github.err.full = на экране помещается 4 репозитория
+github.state.passed = успешно
+github.state.failed = упал
+github.state.running = идёт
+github.state.loading = загрузка…
+github.no_runs = нет запусков
+github.err.not_found = не найден или приватный
+github.err.rate_limit = лимит API GitHub
+github.err.offline = нет сети
+github.err.http = ошибка {code}
+github.status.empty = добавьте репозитории owner/repo
+github.screen.empty1 = добавьте репозитории
+github.screen.empty2 = в приложении
+github.row.loading = загрузка
+github.row.passed = passed
+github.row.failed = failed
+github.row.running = running
+github.status.failing = упавших: {failing} из {total}
+github.status.every_minutes[one] = {n} репоз., обновление раз в {min} мин
+github.status.every_minutes[few] = {n} репоз., обновление раз в {min} мин
+github.status.every_minutes[many] = {n} репоз., обновление раз в {min} мин
+github.status.every_minute[one] = {n} репоз., обновление раз в минуту
+github.status.every_minute[few] = {n} репоз., обновление раз в минуту
+github.status.every_minute[many] = {n} репоз., обновление раз в минуту
+github.subtitle = последние запуски CI по репозиториям
+# ---------------------------------------------------------------- src/live/visualizer.rs
+visualizer.silence = тишина…
+visualizer.title = Визуализатор звука
+visualizer.subtitle = спектр того, что играет на компьютере
+visualizer.listening = слушаю системный звук
+visualizer.err.no_pipewire = нет подключения к PipeWire
+visualizer.err.capture = ошибка захвата звука: {error}
+visualizer.err.pw_format = PipeWire: формат
+visualizer.err.no_output = нет устройства вывода звука
+visualizer.err.no_input = нет устройства записи звука
+visualizer.err.unsupported_format = неподдерживаемый формат звука: {format}
+# ---------------------------------------------------------------- src/live/pomodoro.rs
+pomodoro.phase.work = фокус
+pomodoro.phase.break = перерыв
+pomodoro.phase.long = длинный перерыв
+pomodoro.status = {phase} {time}
+pomodoro.status_paused = {phase} {time} (пауза)
+pomodoro.card.break_title = Время перерыва
+pomodoro.card.work_title = Пора за работу
+pomodoro.card.break_body[one] = Фокус завершён. Отдохните {n} мин.
+pomodoro.card.break_body[few] = Фокус завершён. Отдохните {n} мин.
+pomodoro.card.break_body[many] = Фокус завершён. Отдохните {n} мин.
+pomodoro.card.work_body = Перерыв окончен — следующий фокус.
+pomodoro.log.phase_end = Pomodoro: {title}
+pomodoro.label_paused = {phase} · пауза
+pomodoro.subtitle = фокус 25 мин, перерыв 5 мин
+# ---------------------------------------------------------------- src/live/claudestats.rs
+claudestats.summary = сегодня: {total} токенов (вход {input}, выход {output}, кэш {cache}), ответов {replies}, запросов {prompts}
+claudestats.no_sessions = нет активных сессий
+claudestats.more = и ещё {count}
+claudestats.today = сегодня
+claudestats.tokens_short = {total} ток.
+claudestats.replies = ответов {count}
+claudestats.output = вывод {output}
+claudestats.title = Статистика Claude
+claudestats.subtitle = сессии и токены за сегодня
+# ---------------------------------------------------------------- src/live/nowplaying.rs
+nowplaying.no_player = ни один плеер не запущен
+nowplaying.nothing_playing = Ничего не играет
+nowplaying.title = Сейчас играет
+nowplaying.subtitle = обложка и трек из любого плеера (MPRIS)
+nowplaying.err.unsupported = MPRIS недоступен на этой платформе
+nowplaying.err.no_session_bus = нет сессионной шины D-Bus: {error}
+nowplaying.err.dbus_timeout = D-Bus не отвечает
+# ---------------------------------------------------------------- src/live/sysmon.rs
+sysmon.header = Система
+sysmon.status = CPU {cpu}%  ·  RAM {ram} ГБ
+sysmon.title = Системный монитор
+sysmon.subtitle = CPU, GPU, память, температуры
+
+
+# ================================================================ сцены Claude и карточка уведомления
+
+# ---------------------------------------------------------------- src/claude.rs
+claude.state.working = Работает
+claude.state.alerting = Ждёт вас
+claude.state.chilling = Отдыхает
+claude.state.working_lower = работает
+claude.state.alerting_lower = ждёт вас
+claude.state.chilling_lower = отдыхает
+claude.manual_project = проверка
+claude.caption.allow_tool = Разрешить {tool}?
+claude.caption.waiting_input = Ждёт ответа
+claude.caption.attention = Нужно ваше внимание
+claude.caption.waiting = Ждёт вас
+claude.hooks.bad_json = {file} содержит некорректный JSON — хуки не установлены
+claude.hooks.backup_failed = Не удалось сделать резервную копию
+claude.hooks.installed = Хуки установлены. Новые сессии Claude Code начнут присылать статус.
+claude.hooks.file_not_found = Файл {file} не найден
+claude.hooks.removed = Хуки удалены.
+# ---------------------------------------------------------------- src/faces.rs
+faces.scene.working.classic = Ноутбук
+faces.scene.working.hammer = Кузнец
+faces.scene.working.gears = Шестерёнки
+faces.scene.working.scroll = Свиток
+faces.scene.working.treadmill = Пробежка
+faces.scene.working.juggle = Жонглёр
+faces.scene.working.progress = Прогресс
+faces.scene.alerting.classic = Тревога!
+faces.scene.alerting.wave = Машет руками
+faces.scene.alerting.bell = Колокол
+faces.scene.alerting.siren = Мигалка
+faces.scene.alerting.sign = Табличка «?»
+faces.scene.alerting.knock = Тук-тук
+faces.scene.chilling.classic = Сон под луной
+faces.scene.chilling.coffee = Кофе
+faces.scene.chilling.fishing = Рыбалка
+faces.scene.chilling.beach = Пляж
+faces.scene.chilling.cloud = Облачко
+faces.scene.chilling.bath = Ванна
+faces.sheet.heading = MiniToo Studio — анимации статуса Claude (кадр-пример, 160×128)
+faces.sheet.label[one] = {state} / {id} · {n} кадр.
+faces.sheet.label[few] = {state} / {id} · {n} кадр.
+faces.sheet.label[many] = {state} / {id} · {n} кадр.
+faces.sheet.default = сейчас
+# ---------------------------------------------------------------- src/notify_card.rs
+card.meta = {app} · {time}
+
+
+# ================================================================ ядро: журнал, подсказка трея, командная строка
+
+# ---------------------------------------------------------------- src/main.rs
+cli.help = MiniToo Studio — экран колонки Divoom MiniToo\n\n  minitoo-studio                      окно + трей\n  minitoo-studio --hidden             сразу в трей\n  minitoo-studio --headless           без окна и трея (только колонка и HTTP API)\n  minitoo-studio --send f.gif [--fit crop|fit|stretch]   через запущенное приложение, иначе напрямую\n  minitoo-studio --mode claude|idle   переключить запущенное приложение\n  minitoo-studio --state working|alerting|chilling\n  minitoo-studio --status             JSON /status\n  minitoo-studio --no-device          не подключаться при запуске\n  minitoo-studio --image f.png        открыть картинку при запуске\n  minitoo-studio --debug              журнал в правой панели, диагностика протокола, «пульс»\n  minitoo-studio --screenshot DIR     (отладка) снимки всех страниц в обеих темах, без колонки\n
+cli.needs_value = {name}: нужно значение
+cli.unknown_arg = неизвестный аргумент: {arg}
+cli.scenes_written = сцены записаны в {dir}
+cli.not_running = MiniToo Studio не запущено (порт {port})
+cli.not_sent = не отправлено
+cli.timeout = таймаут: колонка не ответила за 60 с
+
+# ---------------------------------------------------------------- src/worker.rs
+worker.command_forbidden = команда {cmd} не отправлена: она вешает колонку
+worker.send_error = ошибка отправки: {error}
+worker.encode_failed = не удалось закодировать изображение
+worker.no_request = колонка не запросила данные, отправляю всё равно
+worker.resent = колонка запросила повторно {resent} из {total} пакетов
+worker.disconnected = отключено
+worker.no_link = нет связи с колонкой: {error} (повтор через {secs} с)
+worker.connected = подключено
+worker.link_lost = связь потеряна, переподключаюсь
+
+# ---------------------------------------------------------------- src/media.rs
+media.unreadable = не удалось прочитать изображение
+media.unsupported = формат не поддерживается
+media.svg_size = SVG: размер
+
+# ---------------------------------------------------------------- src/transport.rs
+transport.bad_mac = неверный MAC-адрес "{address}"
+transport.error_code = ошибка {code}
+transport.connect_timeout = таймаут подключения
+transport.link_broken = связь разорвана
+transport.closed_by_device = колонка закрыла соединение
+transport.socket_error = ошибка сокета {code}
+transport.no_connection_wsa = нет соединения (WSA {code})
+transport.use_serial_path = на этой платформе укажите вместо MAC путь к последовательному порту колонки (например /dev/cu.DivoomMiniToo-App)
+transport.port_closed = порт закрыт
+
+# ---------------------------------------------------------------- src/app.rs
+log.connecting = подключение к {mac}…
+log.http_port_busy = HTTP-сервер: порт {port} занят ({error})
+log.http_listening = HTTP-сервер: 127.0.0.1:{port}
+log.notifications_error = уведомления: {error}
+log.audio_connected = аудио подключено
+log.audio_error = аудио: {error}
+log.discovery_error = поиск: {error}
+app.portal_restart_failed = не удалось перезапустить портал: {error}
+app.transfer.live = {title}: {kb} КБ, {ms} мс
+app.transfer.stream = трансляция: {kb} КБ/кадр, {ms} мс
+app.transfer.media[one] = {kb} КБ, {n} кадр., {ms} мс
+app.transfer.media[few] = {kb} КБ, {n} кадр., {ms} мс
+app.transfer.media[many] = {kb} КБ, {n} кадр., {ms} мс
+log.sent = отправлено: {transfer}
+log.mode = режим: {title}
+log.rotation[one] = ротация: {n} реж., каждые {secs} с
+log.rotation[few] = ротация: {n} реж., каждые {secs} с
+log.rotation[many] = ротация: {n} реж., каждые {secs} с
+app.open_failed = не удалось открыть {file}: {error}
+app.open_failed_file = не удалось открыть {file}
+log.screen_locked = экран заблокирован: часы, яркость {percent}%
+log.screen_unlocked = экран разблокирован
+log.notification = уведомление: {app} — {text}
+log.battery = заряд колонки: {percent}%
+log.sending[one] = отправка {name} ({n} кадр.)
+log.sending[few] = отправка {name} ({n} кадр.)
+log.sending[many] = отправка {name} ({n} кадр.)
+log.gallery_added = в галерею добавлено: {count}
+log.time_synced = время колонки синхронизировано
+log.bad_hex = неверный hex: {text}
+log.bluez_not_found = колонка не найдена в BlueZ
+log.connecting_audio = подключаю колонку как аудиоустройство (для данных о заряде)…
+app.test_notification.summary = Анна
+app.test_notification.body = Созвон переносим на 20:30, ок?
+log.hooks_installed = хуки Claude Code установлены
+log.hooks_removed = хуки Claude Code удалены
+app.tray.connected = подключена
+app.tray.connecting = подключение…
+app.tray.disconnected = нет связи
+app.tray.tooltip = MiniToo Studio\nКолонка: {device}\nРежим: {mode}\nClaude: {state}
+app.mode.idle = ожидание
+app.mode.image = изображение
+app.mode.screen = трансляция экрана
+app.mode.claude = статус Claude
+app.mode.live = живой режим
+app.on_screen.idle = ничего (ожидание)
+app.reported.source_mode = режим {n}
+app.reported.sd_none = нет
+app.reported.sd_present = есть
+app.reported.off = выключено
+app.reported.minutes = {n} мин
+app.reported.hours12 = 12 ч
+app.reported.hours24 = 24 ч
+app.reported.no = нет
+app.reported.yes = да
+app.reported.sound_number = № {n}
+app.reported.volume = Громкость
+app.reported.brightness = Яркость
+app.reported.source = Источник звука
+app.reported.sd_card = SD-карта
+app.reported.auto_off = Автовыключение
+app.reported.time_format = Формат времени
+app.reported.auto_connect = Автоподключение
+app.reported.notify_sound = Звук уведомлений

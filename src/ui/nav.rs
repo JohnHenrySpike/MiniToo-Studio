@@ -12,13 +12,14 @@ pub struct NavOut {
     pub toggle_theme: bool,
 }
 
+/// Pages: (title key, subtitle key, icon). Texts go through `tr!` where they are shown.
 pub const PAGES: [(&str, &str, &str); 6] = [
-    ("Изображение", "картинки и GIF", "image"),
-    ("Экран", "трансляция области", "screen"),
-    ("Режимы", "часы, музыка, система", "modes"),
-    ("Claude", "статус агентов", "claude"),
-    ("Колонка", "звук, заряд, встроенное", "device"),
-    ("Настройки", "связь и приложение", "settings"),
+    ("nav.image", "nav.image_sub", "image"),
+    ("nav.screen", "nav.screen_sub", "screen"),
+    ("nav.modes", "nav.modes_sub", "modes"),
+    ("nav.claude", "nav.claude_sub", "claude"),
+    ("nav.device", "nav.device_sub", "device"),
+    ("nav.settings", "nav.settings_sub", "settings"),
 ];
 
 fn page_mode(i: usize) -> Option<DisplayMode> {
@@ -57,6 +58,7 @@ pub fn show(ui: &mut Ui, snap: &Snapshot, current: usize, narrow: bool, theme: T
     let claude_alert = snap.claude.state == ClaudeState::Alerting;
     let mut y = logo_top + if narrow { 36.0 } else { logo_h } + 14.0 + 8.0;
     for (i, (name, sub, icon)) in PAGES.iter().enumerate() {
+        let (name, sub) = (tr!(*name), tr!(*sub));
         let rect = Rect::from_min_size(pos2(area.left(), y), vec2(area.width(), 54.0));
         y += 54.0 + 8.0;
         let id = ui.id().with(("nav", i));
@@ -111,7 +113,7 @@ pub fn show(ui: &mut Ui, snap: &Snapshot, current: usize, narrow: bool, theme: T
                 let op = if led_alert { w::blink_opacity(ui, 0.45, 0.35) } else { 1.0 };
                 w::paint_led(&painter, lr, led_color, true, op);
                 let lresp = ui.interact(lr.expand(3.0), id.with("led"), Sense::hover());
-                w::tip(lresp, "Сейчас на колонке");
+                w::tip(lresp, tr!("nav.on_device"));
             }
         }
         let resp = if narrow { w::tip(resp, &format!("{name} — {sub}")) } else { resp };
@@ -122,7 +124,7 @@ pub fn show(ui: &mut Ui, snap: &Snapshot, current: usize, narrow: bool, theme: T
 
     // theme key at the bottom right
     let dark = theme == Theme::Dark;
-    let key = Key::icon_only(if dark { "sun" } else { "moon" }).flat().tip(if dark { "Бежевая тема" } else { "Тёмная тема" });
+    let key = Key::icon_only(if dark { "sun" } else { "moon" }).flat().tip(if dark { tr!("nav.theme_beige") } else { tr!("nav.theme_dark") });
     let size = key.size(ui);
     let r = Rect::from_min_size(pos2(area.right() - size.x, area.bottom() - size.y), size);
     if key.show_at(ui, r).clicked() {

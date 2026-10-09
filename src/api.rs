@@ -305,6 +305,14 @@ pub struct SettingsView {
     pub zstd_level: i32,
     pub close_to_tray: bool,
     pub start_hidden: bool,
+    /// `ui/language`: a catalog code or `auto`
+    pub language: String,
+    /// the language in use (`auto` resolved)
+    pub language_used: String,
+    /// `ui/timeFormat`: `auto`, `24`, `12`
+    pub time_format: String,
+    /// `ui/dateFormat`: `auto` or a pattern (see `i18n::format_date`)
+    pub date_format: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -391,6 +399,12 @@ pub enum Command {
     SetZstdLevel(i32),
     SetCloseToTray(bool),
     SetStartHidden(bool),
+    /// a catalog code or `auto`
+    SetLanguage(String),
+    /// `auto`, `24`, `12`
+    SetTimeFormat(String),
+    /// `auto` or a date pattern
+    SetDateFormat(String),
 
     // ---- image + gallery
     OpenFiles(Vec<PathBuf>),

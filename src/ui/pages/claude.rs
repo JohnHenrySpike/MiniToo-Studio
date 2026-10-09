@@ -39,13 +39,16 @@ pub fn state_color(p: &Palette, s: ClaudeState) -> Color32 {
 fn ago(s: &Session) -> String {
     let secs = (chrono::Local::now() - s.updated).num_seconds().max(0);
     if secs < 60 {
-        format!("{secs} с назад")
+        tr!("claude_page.ago.seconds", n = secs)
     } else if secs < 3600 {
-        format!("{} мин назад", (secs as f64 / 60.0).round() as i64)
+        tr!("claude_page.ago.minutes", n = (secs as f64 / 60.0).round() as i64)
     } else {
-        format!("{} ч назад", (secs as f64 / 3600.0).round() as i64)
+        tr!("claude_page.ago.hours", n = (secs as f64 / 3600.0).round() as i64)
     }
 }
+
+/// File dialog filters for a custom status GIF (names are catalog keys, see `pick_files`).
+const GIF_FILTERS: &[(&str, &[&str])] = &[("ui.files.images", &["gif", "png", "webp", "jpg", "jpeg"]), ("ui.files.all", &["*"])];
 
 fn scene_thumb(st: &mut State, state: ClaudeState, id: &str) -> Arc<SceneThumb> {
     st.scenes
@@ -79,19 +82,19 @@ fn status_card(ui: &mut Ui, cx: &mut Cx) {
             }
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 10.0;
-                w::plate(ui, "статус");
+                w::plate(ui, tr!("claude_page.status.plate"));
                 w::pixel_text(ui, c.state.title(), PixStyle::new(13).zoom(3), state_color(&p, c.state));
                 let n = c.sessions.len();
-                let t = if n == 0 { "Активных сессий нет".to_string() } else { format!("Сессий: {n}") };
+                let t = if n == 0 { tr!("claude_page.status.no_sessions").to_string() } else { trn!("claude_page.status.sessions", n) };
                 w::text(ui, &t, w::font(13.0), p.text_dim);
-                if w::switch(ui, c.interrupt, "Тревога поверх картинки и трансляции", true).clicked() {
+                if w::switch(ui, c.interrupt, tr!("claude_page.status.interrupt"), true).clicked() {
                     cx.send(Command::SetInterrupt(!c.interrupt));
                 }
-                if w::switch(ui, c.idle_alerts, "“Ждёт ввода” после простоя — тоже тревога", true).clicked() {
+                if w::switch(ui, c.idle_alerts, tr!("claude_page.status.idle_alerts"), true).clicked() {
                     cx.send(Command::SetIdleAlerts(!c.idle_alerts));
                 }
-                let r = w::switch(ui, c.alert_caption, "Проект и вопрос на сцене «Ждёт вас»", true);
-                let r = w::tip(r, "Например: «divoom — Разрешить Bash?». Если ждут несколько сессий, рядом с проектом будет «+N».");
+                let r = w::switch(ui, c.alert_caption, tr!("claude_page.status.alert_caption"), true);
+                let r = w::tip(r, tr!("claude_page.status.alert_caption_tip"));
                 if r.clicked() {
                     cx.send(Command::SetAlertCaption(!c.alert_caption));
                 }
@@ -117,16 +120,16 @@ fn face_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, set: &SceneSet, width: f3
         let (r, _) = ui.allocate_exact_size(vec2(width, st12.height(s.title())), Sense::hover());
         crate::ui::pixel::paint_text(ui.painter(), pos2(r.center().x - tw / 2.0, r.top()), s.title(), &st12, state_color(&p, s));
         let caption = match &set.custom {
-            Some(path) => format!("свой файл: {}", path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
-            None => format!("сцена «{}»", faces::variant_title(s, &set.current)),
+            Some(path) => tr!("claude_page.face.custom_file", file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+            None => tr!("claude_page.face.scene", title = faces::variant_title(s, &set.current)),
         };
         let cap = w::elide_middle(ui, &caption, &w::font(11.0), width);
         w::para_w(ui, &cap, w::font(11.0), p.text_dim, width, egui::Align::Center);
 
         // keys
-        let k1 = Key::icon_only("send").tip("Показать на колонке");
-        let k2 = Key::new("Свой GIF…");
-        let k3 = Key::icon_only("refresh").tip("Вернуть встроенные сцены");
+        let k1 = Key::icon_only("send").tip(tr!("claude_page.face.show_tip"));
+        let k2 = Key::new(tr!("claude_page.face.custom_gif"));
+        let k3 = Key::icon_only("refresh").tip(tr!("claude_page.face.reset_tip"));
         let mut kw = k1.size(ui).x + 6.0 + k2.size(ui).x;
         if set.custom.is_some() {
             kw += 6.0 + k3.size(ui).x;
@@ -138,8 +141,7 @@ fn face_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, set: &SceneSet, width: f3
             }
             if k2.show(ui).clicked() {
                 let core = cx.core.clone();
-                const FILTERS: &[(&str, &[&str])] = &[("Изображения", &["gif", "png", "webp", "jpg", "jpeg"]), ("Все файлы", &["*"])];
-                pick_files("GIF или изображение для статуса", FILTERS, false, move |f| {
+                pick_files(tr!("claude_page.face.pick_title"), GIF_FILTERS, false, move |f| {
                     if let Some(path) = f.into_iter().next() {
                         core.send(Command::SetCustomFace(s, Some(path)));
                     }
@@ -181,7 +183,7 @@ fn face_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, set: &SceneSet, width: f3
                 ui.painter().rect_filled(frame_rect.expand(3.0), 4, p.shell.gamma_multiply(op * 0.85));
             }
             let title = faces::variant_title(s, id);
-            let resp = w::tip(resp, &format!("«{title}» — нажмите, чтобы показать на колонке"));
+            let resp = w::tip(resp, &tr!("claude_page.face.scene_tip", title = title));
             if resp.clicked() {
                 cx.send(Command::PickScene(s, id.to_string()));
             }
@@ -193,7 +195,7 @@ fn face_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, set: &SceneSet, width: f3
             if enabled {
                 crate::ui::pixel::paint_icon(ui.painter(), b.center() - vec2(6.0, 6.0), "check", 1, WHITE.gamma_multiply(dim), None);
             }
-            let cresp = w::tip(cresp, if enabled { "В наборе — убрать" } else { "Добавить в набор" });
+            let cresp = w::tip(cresp, if enabled { tr!("claude_page.face.set_remove") } else { tr!("claude_page.face.set_add") });
             if cresp.clicked() {
                 cx.send(Command::SetSceneEnabled(s, id.to_string(), !enabled));
             }
@@ -204,7 +206,7 @@ fn face_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, set: &SceneSet, width: f3
 fn faces_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     let p = pal();
     let snap = cx.snap;
-    w::group(ui, "Анимации состояний", |ui| {
+    w::group(ui, tr!("claude_page.faces.group"), |ui| {
         ui.spacing_mut().item_spacing.y = 14.0;
         let width = ui.available_width();
         let three = width >= 690.0;
@@ -227,17 +229,18 @@ fn faces_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
             }
             ui.spacing_mut().item_spacing.y = 14.0;
         }
-        const SCENE_HINT: &str = "При каждой смене состояния показывается случайная сцена из отмеченных галочкой; если состояние долго не меняется — следующая через заданное время (кроме «Ждёт вас»). Свой GIF заменяет все сцены состояния.";
-        let lw = w::text_width(ui, "Менять сцену каждые", w::font(13.0));
+        let scene_hint = tr!("claude_page.faces.hint");
+        let every = tr!("claude_page.faces.every");
+        let lw = w::text_width(ui, every, w::font(13.0));
         let rest = ui.available_width() - lw - 140.0 - 20.0;
-        let hh = w::galley_wrapped(ui, SCENE_HINT, w::font(12.0), p.text_dim, rest).size().y;
+        let hh = w::galley_wrapped(ui, scene_hint, w::font(12.0), p.text_dim, rest).size().y;
         w::row(ui, hh.max(33.0), 10.0, |ui| {
-            w::text(ui, "Менять сцену каждые", w::font(13.0), p.text);
-            let fmt = |v: i64| if v == 0 { "нет".to_string() } else { format!("{v} мин") };
+            w::text(ui, every, w::font(13.0), p.text);
+            let fmt = |v: i64| if v == 0 { tr!("claude_page.faces.every_off").to_string() } else { tr!("claude_page.faces.every_value", v = v) };
             if let Some(v) = Spin::new("scene-minutes", snap.claude.scene_minutes as i64, 0, 60).width(140.0).fmt(&fmt).show(ui) {
                 cx.send(Command::SetSceneMinutes(v as u32));
             }
-            w::para_w(ui, SCENE_HINT, w::font(12.0), p.text_dim, rest, egui::Align::Min);
+            w::para_w(ui, scene_hint, w::font(12.0), p.text_dim, rest, egui::Align::Min);
         });
     });
 }
@@ -246,7 +249,7 @@ fn sessions_group(ui: &mut Ui, cx: &mut Cx) {
     let p = pal();
     let c = &cx.snap.claude;
     ui.ctx().request_repaint_after(Duration::from_secs(5));
-    w::group(ui, "Сессии", |ui| {
+    w::group(ui, tr!("claude_page.sessions.group"), |ui| {
         ui.spacing_mut().item_spacing.y = 6.0;
         for s in &c.sessions {
             w::row(ui, 34.0, 12.0, |ui| {
@@ -269,23 +272,23 @@ fn sessions_group(ui: &mut Ui, cx: &mut Cx) {
         }
         if c.sessions.is_empty() {
             let t = if c.hooks_installed {
-                "Нет активных сессий. Запустите Claude Code — сессии появятся здесь."
+                tr!("claude_page.sessions.empty")
             } else {
-                "Установите хуки ниже, чтобы Claude Code сообщал свой статус."
+                tr!("claude_page.sessions.no_hooks")
             };
             w::hint(ui, t);
         }
         ui.add_space(4.0);
         w::row(ui, 30.0, 6.0, |ui| {
-            w::text(ui, "Проверить:", w::font(13.0), p.text_dim);
+            w::text(ui, tr!("claude_page.sessions.test"), w::font(13.0), p.text_dim);
             for s in ClaudeState::ALL {
-                let k = Key::new(s.title()).flat().tip("На 10 секунд: колонка покажет сцену в любом режиме, затем вернётся к прежнему");
+                let k = Key::new(s.title()).flat().tip(tr!("claude_page.sessions.test_tip"));
                 if k.show(ui).clicked() {
                     cx.send(Command::TestState(s));
                 }
             }
             w::right(ui, |ui| {
-                if Key::new("Очистить").icon("trash").flat().show(ui).clicked() {
+                if Key::new(tr!("claude_page.sessions.clear")).icon("trash").flat().show(ui).clicked() {
                     cx.send(Command::ClearSessions);
                 }
             });
@@ -300,13 +303,13 @@ fn hooks_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         st.hooks_seen = c.hooks_message.clone();
         st.copied = None;
     }
-    w::group(ui, "Подключение к Claude Code", |ui| {
+    w::group(ui, tr!("claude_page.hooks.group"), |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
-        let lw = w::text_width(ui, "Сервер событий", w::font(13.0));
+        let lw = w::text_width(ui, tr!("claude_page.hooks.server"), w::font(13.0)).max(w::text_width(ui, tr!("claude_page.hooks.hooks"), w::font(13.0)));
         w::row(ui, 33.0, 10.0, |ui| {
             w::led(ui, if c.listening { p.ok } else { p.danger }, true, false);
             let (r, _) = ui.allocate_exact_size(vec2(lw, 18.0), Sense::hover());
-            let g = w::galley(ui, "Сервер событий", w::font(13.0), p.text);
+            let g = w::galley(ui, tr!("claude_page.hooks.server"), w::font(13.0), p.text);
             ui.painter().galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, p.text);
             ui.spacing_mut().item_spacing.x = 8.0;
             w::text(ui, "127.0.0.1:", w::font(13.0), p.text);
@@ -315,9 +318,9 @@ fn hooks_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
                 cx.send(Command::SetPort(v as u16));
             }
             let (t, col) = if c.listening {
-                ("слушает; после смены порта переустановите хуки", p.text_dim)
+                (tr!("claude_page.hooks.listening"), p.text_dim)
             } else {
-                ("порт занят — выберите другой", p.danger)
+                (tr!("claude_page.hooks.port_busy"), p.danger)
             };
             let rest = ui.available_width();
             w::para_w(ui, t, w::font(12.0), col, rest, egui::Align::Min);
@@ -325,32 +328,29 @@ fn hooks_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         w::row(ui, 22.0, 10.0, |ui| {
             w::led(ui, p.ok, c.hooks_installed, false);
             let (r, _) = ui.allocate_exact_size(vec2(lw, 18.0), Sense::hover());
-            let g = w::galley(ui, "Хуки", w::font(13.0), p.text);
+            let g = w::galley(ui, tr!("claude_page.hooks.hooks"), w::font(13.0), p.text);
             ui.painter().galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, p.text);
-            let t = if c.hooks_installed { format!("установлены в {}", c.hooks_path) } else { "не установлены".into() };
+            let t = if c.hooks_installed { tr!("claude_page.hooks.installed_in", path = c.hooks_path) } else { tr!("claude_page.hooks.not_installed").into() };
             w::text_elided(ui, &t, w::font(13.0), p.text, None);
         });
         w::hint(
             ui,
-            &format!(
-                "Кнопка добавит в {} хуки SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop и SessionEnd (с резервной копией файла). Каждый хук — короткий curl на локальный порт; если приложение не запущено, он молча завершится и Claude не заметит.",
-                c.hooks_path
-            ),
+            &tr!("claude_page.hooks.hint", path = c.hooks_path),
         );
         w::row(ui, 33.0, 8.0, |ui| {
-            if Key::new("Установить хуки").icon("plus").accent(!c.hooks_installed).show(ui).clicked() {
+            if Key::new(tr!("claude_page.hooks.install")).icon("plus").accent(!c.hooks_installed).show(ui).clicked() {
                 cx.send(Command::InstallHooks);
             }
-            if Key::new("Удалить хуки").icon("trash").enabled(c.hooks_installed).show(ui).clicked() {
+            if Key::new(tr!("claude_page.hooks.uninstall")).icon("trash").enabled(c.hooks_installed).show(ui).clicked() {
                 cx.send(Command::UninstallHooks);
             }
-            if Key::new("Скопировать JSON").icon("copy").show(ui).clicked() {
+            if Key::new(tr!("claude_page.hooks.copy_json")).icon("copy").show(ui).clicked() {
                 ui.ctx().copy_text(c.snippet.clone());
                 st.copied = Some(Instant::now());
             }
         });
         if st.copied.is_some() {
-            w::para(ui, "JSON скопирован в буфер обмена", w::font(13.0), p.ok);
+            w::para(ui, tr!("claude_page.hooks.copied"), w::font(13.0), p.ok);
         } else if let Some((ok, msg)) = &c.hooks_message {
             w::para(ui, msg, w::font(13.0), if *ok { p.ok } else { p.danger });
         }
@@ -377,8 +377,8 @@ fn hooks_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
 pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     scroll_page(ui, "claude-page", None, |ui| {
         let on = cx.snap.claude.mode_on || cx.snap.mode == DisplayMode::Claude;
-        w::page_header(ui, "Claude", "статус Claude Code на экране колонки", |ui| {
-            if w::switch(ui, on, "Показывать на колонке", true).clicked() {
+        w::page_header(ui, "Claude", tr!("claude_page.page.subtitle"), |ui| {
+            if w::switch(ui, on, tr!("claude_page.page.show_on_device"), true).clicked() {
                 cx.send(Command::SetClaudeMode(!on));
             }
         });

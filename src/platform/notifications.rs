@@ -33,7 +33,7 @@ pub fn spawn_monitor(rt: &tokio::runtime::Handle, on: NotifySink) -> MonitorGuar
     #[cfg(not(target_os = "linux"))]
     {
         let _ = rt;
-        on(Err("мониторинг уведомлений недоступен на этой платформе".into()));
+        on(Err(tr!("notify.unsupported").into()));
         MonitorGuard {}
     }
 }
@@ -399,9 +399,9 @@ mod linux {
     const RULE: &str = "type='method_call',interface='org.freedesktop.Notifications',member='Notify'";
 
     pub async fn run(on: &NotifySink) -> Result<(), String> {
-        let stream = connect().await.map_err(|e| format!("сессионная шина D-Bus недоступна: {e}"))?;
+        let stream = connect().await.map_err(|e| tr!("notify.no_session_bus", error = e))?;
         let mut conn = BufReader::new(stream);
-        auth(&mut conn).await.map_err(|e| format!("авторизация на шине D-Bus: {e}"))?;
+        auth(&mut conn).await.map_err(|e| tr!("notify.auth_failed", error = e))?;
 
         const BUS: (&str, &str, &str) = ("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus");
         let hello = wire::method_call(1, BUS.0, BUS.1, BUS.2, "Hello", "", &[]);
@@ -411,13 +411,13 @@ mod linux {
         let monitor = wire::method_call(2, BUS.0, BUS.1, "org.freedesktop.DBus.Monitoring", "BecomeMonitor", "asu", &body.buf);
         let mut out = hello;
         out.extend_from_slice(&monitor);
-        conn.get_mut().write_all(&out).await.map_err(|e| format!("шина D-Bus: {e}"))?;
+        conn.get_mut().write_all(&out).await.map_err(|e| tr!("notify.bus_error", error = e))?;
         // from here on the connection only reads
 
         let mut monitoring = false;
         loop {
             let msg = read_message(&mut conn).await.map_err(|e| {
-                if monitoring { format!("мониторинг уведомлений прерван: {e}") } else { format!("шина D-Bus: {e}") }
+                if monitoring { tr!("notify.interrupted", error = e) } else { tr!("notify.bus_error", error = e) }
             })?;
             let Some(msg) = wire::parse(&msg) else { continue };
             match msg.kind {
@@ -426,7 +426,7 @@ mod linux {
                         Some(wire::Value::Str(s)) => format!("{}: {s}", msg.error_name),
                         _ => msg.error_name,
                     };
-                    return Err(format!("BecomeMonitor не удался: {text}"));
+                    return Err(tr!("notify.monitor_failed", error = text));
                 }
                 wire::METHOD_RETURN if msg.reply_serial == Some(2) => monitoring = true,
                 wire::METHOD_CALL
@@ -445,7 +445,7 @@ mod linux {
         let mut head = [0u8; 16];
         conn.read_exact(&mut head).await?;
         let len = wire::frame_len(&head)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "повреждённое сообщение"))?;
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, tr!("notify.bad_message")))?;
         let mut msg = vec![0; len];
         msg[..16].copy_from_slice(&head);
         conn.read_exact(&mut msg[16..]).await?;
@@ -465,7 +465,7 @@ mod linux {
     }
 
     async fn connect() -> io::Result<UnixStream> {
-        let mut last = io::Error::new(io::ErrorKind::NotFound, "DBUS_SESSION_BUS_ADDRESS не задан");
+        let mut last = io::Error::new(io::ErrorKind::NotFound, tr!("notify.no_bus_address"));
         let addresses = match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(a) => a,
             Err(_) => match std::env::var("XDG_RUNTIME_DIR") {

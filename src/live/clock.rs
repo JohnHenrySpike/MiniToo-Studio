@@ -1,4 +1,4 @@
-//! Часы и погода (`clock`, §8.2): three faces («Небо», «Неон», «Пиксели»), Open-Meteo weather and
+//! «Часы и погода» (`clock`, §8.2): three faces («Небо», «Неон», «Пиксели»), Open-Meteo weather and
 //! city search, and "a minute ahead" device frames.
 
 use super::{shortest_period, City, ClockView, LiveMode, ModeCommand, ModeCx, ModeMsg, ModeView};
@@ -6,7 +6,7 @@ use crate::canvas::{r, Align, Canvas, LineCap, LineJoin, R};
 use crate::color::Color;
 use crate::fonts::FontSpec;
 use crate::frame::{Frame, HEIGHT, WIDTH};
-use chrono::{Datelike, Duration as ChronoDuration, NaiveDateTime, Timelike};
+use chrono::{Duration as ChronoDuration, NaiveDateTime, Timelike};
 use std::time::Duration;
 use tiny_skia::PathBuilder;
 
@@ -126,7 +126,7 @@ impl Clock {
 
     fn fetch_weather(&mut self, cx: &mut ModeCx) {
         let Some(city) = self.city.clone() else {
-            cx.set_status("укажите город для погоды");
+            cx.set_status(tr!("clock.status.no_city"));
             return;
         };
         self.weather_serial += 1;
@@ -159,7 +159,7 @@ impl Clock {
         if running {
             self.fetch_weather(cx);
         } else if self.city.is_none() {
-            cx.set_status("укажите город для погоды");
+            cx.set_status(tr!("clock.status.no_city"));
         }
         self.render(cx);
     }
@@ -201,12 +201,15 @@ impl Clock {
         let (top, bottom) = if night { (0x0a0e24, 0x1e224a) } else { (0x1c4080, 0x4a76ba) };
         c.vgradient(0.0, 0.0, WIDTH as f32, HEIGHT as f32, Color::hex(top), Color::hex(bottom));
         let y = if self.weather.is_some() { 8.0 } else { 26.0 };
-        c.text(r(0.0, y, 160.0, 46.0), Align::CENTER, &now.format("%H:%M").to_string(), FontSpec::bold(42.0), Color::WHITE);
-        c.text(r(0.0, y + 46.0, 160.0, 16.0), Align::CENTER, &ru_long_date(now), FontSpec::sans(11.0), Color::hex(0xcdd7f0));
+        time_text(&mut c, r(0.0, y, 160.0, 46.0), &now, 42.0, Color::WHITE, |c, rect, s, f, col| c.text(rect, Align::CENTER, s, f, col));
+        let date = crate::i18n::date_long(&now);
+        let date_font = FontSpec::sans(11.0);
+        c.text(r(0.0, y + 46.0, 160.0, 16.0), Align::CENTER, &Canvas::elide(&date, date_font, 156.0), date_font, Color::hex(0xcdd7f0));
         if let Some(w) = &self.weather {
             draw_weather_icon(&mut c, 14.0, 84.0, w.code, w.is_day);
             c.text(r(52.0, 82.0, 60.0, 22.0), Align::LEFT, &format!("{}°", qround(w.temp)), FontSpec::bold(20.0), Color::WHITE);
-            c.text(r(52.0, 104.0, 70.0, 14.0), Align::LEFT, weather_text(w.code), FontSpec::sans(10.0), Color::hex(0xcdd7f0));
+            let font = FontSpec::sans(10.0);
+            c.text(r(52.0, 104.0, 70.0, 14.0), Align::LEFT, &Canvas::elide(weather_text(w.code), font, 70.0), font, Color::hex(0xcdd7f0));
             c.text(r(104.0, 84.0, 50.0, 14.0), Align::RIGHT, &format!("↑{}°", qround(w.tmax)), FontSpec::sans(10.0), Color::hex(0xffd2aa));
             c.text(r(104.0, 100.0, 50.0, 14.0), Align::RIGHT, &format!("↓{}°", qround(w.tmin)), FontSpec::sans(10.0), Color::hex(0xb4d2ff));
         }
@@ -231,8 +234,9 @@ impl Clock {
             x += 20;
         }
 
-        let date = format!("{} {}", now.format("%Y-%m-%d"), EN_WEEKDAYS[now.weekday().num_days_from_monday() as usize]);
-        glow_text(&mut c, r(0.0, 4.0, 160.0, 18.0), &date, FontSpec::bold(12.0), cyan);
+        let date_font = FontSpec::bold(12.0);
+        let date = format!("{} {}", crate::i18n::date_numeric(&now), crate::i18n::weekday_short(&now));
+        glow_text(&mut c, r(0.0, 4.0, 160.0, 18.0), &Canvas::elide(&date, date_font, 154.0), date_font, cyan);
         // dotted cyan line (Qt DotLine, 1 px pen on y = 25 → two half-lit rows)
         c.blend_pixel(13, 24, cyan.with_alpha(64));
         c.blend_pixel(13, 25, cyan.with_alpha(64));
@@ -246,12 +250,17 @@ impl Clock {
         if let Some(frame) = Canvas::round_rect_path(12.0, 30.0, 136.0, 50.0, 7.0) {
             glow_path(&mut c, &frame, pink, 2.0);
         }
-        let time = if now.second() % 2 == 1 { now.format("%H:%M") } else { now.format("%H %M") }.to_string();
-        glow_text(&mut c, r(12.0, 30.0, 136.0, 50.0), &time, FontSpec::bold(38.0), pink);
+        // the colon blinks: the digits stay put, only the colon goes
+        let colon = now.second() % 2 == 1;
+        time_text(&mut c, r(12.0, 30.0, 136.0, 50.0), &now, 38.0, pink, |c, rect, s, f, col| {
+            let s = if colon || !s.contains(':') { s.to_string() } else { s.replacen(':', " ", 1) };
+            glow_text(c, rect, &s, f, col)
+        });
 
         if let Some(w) = &self.weather {
+            let font = FontSpec::bold(12.0);
             let line = format!("{}°  {}", qround(w.temp), weather_text(w.code).to_uppercase());
-            glow_text(&mut c, r(10.0, 88.0, 140.0, 18.0), &line, FontSpec::bold(12.0), cyan);
+            glow_text(&mut c, r(10.0, 88.0, 140.0, 18.0), &Canvas::elide(&line, font, 156.0), font, cyan);
             let mm = format!("↑{}°  ↓{}°", qround(w.tmax), qround(w.tmin));
             glow_text(&mut c, r(10.0, 106.0, 140.0, 16.0), &mm, FontSpec::sans(10.0), Color::hex(0xff96d2));
         } else {
@@ -296,8 +305,19 @@ impl Clock {
             }
         };
         let x0 = (WIDTH as i32 - (4 * 3 * cell + 3 * cell + cell)) / 2 + 1;
-        digit(&mut c, now.hour() / 10, x0);
-        digit(&mut c, now.hour() % 10, x0 + 4 * cell);
+        let twelve = crate::i18n::twelve_hours();
+        let hour = if twelve { (now.hour() + 11) % 12 + 1 } else { now.hour() };
+        if hour >= 10 || !twelve {
+            digit(&mut c, hour / 10, x0);
+        } else {
+            // 12-hour time has no leading zero: the cells of the first digit stay dark
+            for row in 0..5 {
+                for col in 0..3 {
+                    c.fill_rect((x0 + col * cell) as f32, (top + row * cell) as f32, dot as f32, dot as f32, dim);
+                }
+            }
+        }
+        digit(&mut c, hour % 10, x0 + 4 * cell);
         let colon = if now.second() % 2 == 0 { lit } else { dim };
         c.fill_rect((x0 + 8 * cell) as f32, (top + cell) as f32, dot as f32, dot as f32, colon);
         c.fill_rect((x0 + 8 * cell) as f32, (top + 3 * cell) as f32, dot as f32, dot as f32, colon);
@@ -311,9 +331,15 @@ impl Clock {
             c.fill_rect((5 + i * 5) as f32, y as f32, 3.0, 2.0, color);
         }
 
-        pixel_text(&mut c, y + 8, &ru_short_date(now).to_uppercase(), 10.0, Color::hex(0xe6d2be));
+        let date = crate::i18n::date_short(&now).to_uppercase();
+        let date = match crate::i18n::am_pm(&now) {
+            Some(m) => tr!("clock.pixel.date_ampm", ampm = m, date = date),
+            None => date,
+        };
+        pixel_text(&mut c, y + 8, &Canvas::elide(&date, FontSpec::bold(10.0).no_aa(), 156.0), 10.0, Color::hex(0xe6d2be));
         if let Some(w) = &self.weather {
-            pixel_text(&mut c, y + 26, &format!("{}°  {}", qround(w.temp), weather_text(w.code)), 10.0, lit);
+            let line = format!("{}°  {}", qround(w.temp), weather_text(w.code));
+            pixel_text(&mut c, y + 26, &Canvas::elide(&line, FontSpec::bold(10.0).no_aa(), 156.0), 10.0, lit);
             let mm = format!("↑{}° ↓{}°", qround(w.tmax), qround(w.tmin));
             pixel_text(&mut c, y + 42, &mm, 9.0, Color::hex(0xa08c7d));
         }
@@ -326,10 +352,10 @@ impl LiveMode for Clock {
         "clock"
     }
     fn title(&self) -> &'static str {
-        "Часы и погода"
+        tr!("clock.title")
     }
     fn subtitle(&self) -> &'static str {
-        "время, дата, Open-Meteo"
+        tr!("clock.subtitle")
     }
     fn icon(&self) -> &'static str {
         "clock"
@@ -404,11 +430,11 @@ impl LiveMode for Clock {
                     Ok(w) => {
                         self.weather = Some(w);
                         let name = self.city.as_ref().map(|c| c.name.clone()).unwrap_or_default();
-                        let at = cx.now().format("%H:%M");
-                        cx.set_status(format!("{name}: {}°, {}, обновлено {at}", qround(w.temp), weather_text(w.code)));
+                        let at = crate::i18n::time_hm(&cx.now());
+                        cx.set_status(tr!("clock.status.weather", city = name, temp = qround(w.temp), sky = weather_text(w.code), time = at));
                         self.render(cx);
                     }
-                    Err(e) => cx.set_status(format!("погода: {e}")),
+                    Err(e) => cx.set_status(tr!("clock.status.weather_error", error = e)),
                 }
             }
         }
@@ -468,11 +494,11 @@ impl Clock {
 // ---------------------------------------------------------------------- network
 
 async fn search_cities(http: &reqwest::Client, q: &str) -> Result<Vec<City>, String> {
-    let url = reqwest::Url::parse_with_params(SEARCH_URL, &[("name", q), ("count", "8"), ("language", "ru")])
+    let url = reqwest::Url::parse_with_params(SEARCH_URL, &[("name", q), ("count", "8"), ("language", crate::i18n::current().code.as_str())])
         .map_err(|e| e.to_string())?;
     let resp = http.get(url).send().await.map_err(net_error)?;
     if !resp.status().is_success() {
-        return Err(format!("ошибка HTTP {}", resp.status().as_u16()));
+        return Err(tr!("clock.error.http", status = resp.status().as_u16()));
     }
     let v: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
     Ok(parse_cities(&v))
@@ -523,17 +549,17 @@ async fn fetch_forecast(http: &reqwest::Client, lat: f64, lon: f64) -> Result<We
     .map_err(|e| e.to_string())?;
     let resp = http.get(url).send().await.map_err(net_error)?;
     if !resp.status().is_success() {
-        return Err(format!("ошибка HTTP {}", resp.status().as_u16()));
+        return Err(tr!("clock.error.http", status = resp.status().as_u16()));
     }
     let v: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    parse_forecast(&v).ok_or_else(|| "неожиданный ответ".to_string())
+    parse_forecast(&v).ok_or_else(|| tr!("clock.error.reply").to_string())
 }
 
 fn net_error(e: reqwest::Error) -> String {
     if e.is_timeout() {
-        "таймаут".to_string()
+        tr!("clock.error.timeout").to_string()
     } else if e.is_connect() {
-        "нет соединения".to_string()
+        tr!("clock.error.connect").to_string()
     } else {
         e.to_string()
     }
@@ -555,19 +581,19 @@ pub fn parse_forecast(v: &serde_json::Value) -> Option<Weather> {
 
 // ---------------------------------------------------------------------- text helpers
 
-/// WMO weather code → Russian description.
+/// WMO weather code → a short description.
 pub fn weather_text(code: i64) -> &'static str {
     match code {
-        0 => "ясно",
-        1..=2 => "малооблачно",
-        3 => "пасмурно",
-        45 | 48 => "туман",
-        51..=57 => "морось",
-        61..=67 => "дождь",
-        71..=77 => "снег",
-        80..=82 => "ливень",
-        85 | 86 => "снегопад",
-        c if c >= 95 => "гроза",
+        0 => tr!("clock.weather.clear"),
+        1..=2 => tr!("clock.weather.partly_cloudy"),
+        3 => tr!("clock.weather.overcast"),
+        45 | 48 => tr!("clock.weather.fog"),
+        51..=57 => tr!("clock.weather.drizzle"),
+        61..=67 => tr!("clock.weather.rain"),
+        71..=77 => tr!("clock.weather.snow"),
+        80..=82 => tr!("clock.weather.showers"),
+        85 | 86 => tr!("clock.weather.snowfall"),
+        c if c >= 95 => tr!("clock.weather.thunderstorm"),
         _ => "",
     }
 }
@@ -577,20 +603,28 @@ fn qround(v: f64) -> i64 {
     v.round() as i64
 }
 
-const RU_WEEKDAYS: [&str; 7] = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
-const RU_WEEKDAYS_SHORT: [&str; 7] = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
-const RU_MONTHS_GEN: [&str; 12] =
-    ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-const EN_WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-/// «пятница, 9 октября» (Qt ru_RU "dddd, d MMMM")
-pub fn ru_long_date(d: NaiveDateTime) -> String {
-    format!("{}, {} {}", RU_WEEKDAYS[d.weekday().num_days_from_monday() as usize], d.day(), RU_MONTHS_GEN[d.month0() as usize])
-}
-
-/// «пт, 9 октября» (Qt ru_RU "ddd, d MMMM")
-pub fn ru_short_date(d: NaiveDateTime) -> String {
-    format!("{}, {} {}", RU_WEEKDAYS_SHORT[d.weekday().num_days_from_monday() as usize], d.day(), RU_MONTHS_GEN[d.month0() as usize])
+/// Big clock digits centred in `rect`, with a small AM/PM after them when time is shown in 12
+/// hours; the digits shrink if both do not fit. `draw` paints one text in a rect, centred.
+fn time_text(c: &mut Canvas, rect: R, now: &NaiveDateTime, px: f32, color: Color, mut draw: impl FnMut(&mut Canvas, R, &str, FontSpec, Color)) {
+    let digits = crate::i18n::clock_digits(now);
+    let Some(marker) = crate::i18n::am_pm(now) else {
+        draw(c, rect, &digits, FontSpec::bold(px), color);
+        return;
+    };
+    let mark_font = FontSpec::bold((px * 0.3).round().max(9.0));
+    let mark_w = Canvas::text_width(marker, mark_font).ceil();
+    let gap = 3.0;
+    let mut font = FontSpec::bold(px);
+    while font.px > 12.0 && Canvas::text_width(&digits, font) + gap + mark_w > rect.w - 6.0 {
+        font = FontSpec::bold(font.px - 1.0);
+    }
+    let dw = Canvas::text_width(&digits, font).ceil();
+    let x = rect.x + ((rect.w - dw - gap - mark_w) / 2.0).round();
+    draw(c, r(x, rect.y, dw, rect.h), &digits, font, color);
+    // the marker sits on the baseline of the digits
+    let base = rect.y + ((rect.h - font.height()) / 2.0).round() + font.ascent().round();
+    let my = base - mark_font.ascent().round();
+    draw(c, r(x + dw + gap, my, mark_w, mark_font.height().ceil()), marker, mark_font, color);
 }
 
 // ---------------------------------------------------------------------- drawing helpers
@@ -770,8 +804,8 @@ mod tests {
 
     #[test]
     fn russian_dates() {
-        assert_eq!(ru_long_date(at(0, 47, 0)), "пятница, 9 октября");
-        assert_eq!(ru_short_date(at(0, 47, 0)).to_uppercase(), "ПТ, 9 ОКТЯБРЯ");
+        assert_eq!(crate::i18n::date_long(&at(0, 47, 0)), "пятница, 9 октября");
+        assert_eq!(crate::i18n::date_short(&at(0, 47, 0)).to_uppercase(), "ПТ, 9 ОКТЯБРЯ");
     }
 
     #[test]

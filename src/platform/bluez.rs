@@ -34,7 +34,7 @@ pub async fn connect_audio(mac: String) -> Result<(), String> {
     #[cfg(not(target_os = "linux"))]
     {
         let _ = mac;
-        Err("недоступно на этой платформе".into())
+        Err(tr!("bluez.unsupported").into())
     }
 }
 
@@ -47,7 +47,7 @@ pub async fn discover(secs: u64) -> Result<Vec<(String, String)>, String> {
     #[cfg(not(target_os = "linux"))]
     {
         let _ = secs;
-        Err("недоступно на этой платформе".into())
+        Err(tr!("bluez.unsupported").into())
     }
 }
 
@@ -128,8 +128,8 @@ mod linux {
     pub async fn system() -> Result<Connection, String> {
         tokio::time::timeout(CALL_TIMEOUT, Connection::system())
             .await
-            .map_err(|_| "системная шина D-Bus не отвечает".to_string())?
-            .map_err(|e| format!("системная шина D-Bus недоступна: {e}"))
+            .map_err(|_| tr!("bluez.bus_timeout").to_string())?
+            .map_err(|e| tr!("bluez.bus_unavailable", error = e))
     }
 
     fn describe(e: zbus::Error) -> String {
@@ -137,7 +137,7 @@ mod linux {
             zbus::Error::MethodError(name, msg, _) => {
                 let name = name.as_str();
                 if name == "org.freedesktop.DBus.Error.ServiceUnknown" || name == "org.freedesktop.DBus.Error.NameHasNoOwner" {
-                    return "служба BlueZ не запущена".into();
+                    return tr!("bluez.not_running").into();
                 }
                 let short = name.rsplit('.').next().unwrap_or(name);
                 match msg {
@@ -155,25 +155,25 @@ mod linux {
     {
         tokio::time::timeout(timeout, conn.call_method(Some(BLUEZ), path, Some(iface), member, body))
             .await
-            .map_err(|_| format!("{member}: нет ответа за {} с", timeout.as_secs()))?
+            .map_err(|_| tr!("bluez.call_timeout", call = member, secs = timeout.as_secs()))?
             .map_err(describe)
     }
 
     pub async fn managed_objects(conn: &Connection) -> Result<Objects, String> {
         let reply = call(conn, "/", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects", &(), CALL_TIMEOUT).await?;
-        reply.body().deserialize::<Objects>().map_err(|e| format!("ответ BlueZ не разобран: {e}"))
+        reply.body().deserialize::<Objects>().map_err(|e| tr!("bluez.bad_reply", error = e))
     }
 
     pub async fn connect_audio(mac: &str) -> Result<(), String> {
         let conn = system().await?;
         let objects = managed_objects(&conn).await?;
         let path = super::device_path(&objects, mac)
-            .ok_or_else(|| format!("колонка {mac} не найдена в BlueZ (её нужно сначала сопрячь)"))?
+            .ok_or_else(|| tr!("bluez.device_not_found", mac = mac))?
             .to_string();
         call(&conn, &path, "org.bluez.Device1", "Connect", &(), Duration::from_secs(30))
             .await
             .map(drop)
-            .map_err(|e| format!("не удалось подключить: {e}"))
+            .map_err(|e| tr!("bluez.connect_failed", error = e))
     }
 
     fn adapter(objects: &Objects) -> Result<String, String> {
@@ -187,8 +187,8 @@ mod linux {
             .collect();
         adapters.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
         match adapters.first() {
-            None => Err("Bluetooth-адаптер не найден".into()),
-            Some((_, false)) => Err("Bluetooth выключен".into()),
+            None => Err(tr!("bluez.no_adapter").into()),
+            Some((_, false)) => Err(tr!("bluez.powered_off").into()),
             Some((path, true)) => Ok(path.to_string()),
         }
     }
@@ -203,7 +203,7 @@ mod linux {
         }
         call(&conn, &adapter, IFACE, "StartDiscovery", &(), CALL_TIMEOUT)
             .await
-            .map_err(|e| format!("поиск не запустился: {e}"))?;
+            .map_err(|e| tr!("bluez.discovery_failed", error = e))?;
         tokio::time::sleep(Duration::from_secs(secs)).await;
         let found = managed_objects(&conn).await.map(|o| super::discovered(&o, &adapter));
         let stopped = call(&conn, &adapter, IFACE, "StopDiscovery", &(), CALL_TIMEOUT).await;

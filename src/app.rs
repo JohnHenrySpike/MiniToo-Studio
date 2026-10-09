@@ -221,6 +221,8 @@ pub struct Controller {
 
     tray: Option<tray::Tray>,
     tray_state: Option<tray::TrayState>,
+    /// the catalog in use (`ui/language` may say `auto`)
+    language_used: String,
     show_serial: u64,
     quit: bool,
     page: usize,
@@ -409,6 +411,7 @@ impl Controller {
             away_brightness: settings.int_in("away/brightness", 15, 0, 100) as u8,
             tray: None,
             tray_state: None,
+            language_used: crate::i18n::current().code.clone(),
             show_serial: 0,
             quit: false,
             page: settings.int_in("ui/page", 0, 0, 5) as usize,
@@ -477,7 +480,7 @@ impl Controller {
         // HTTP
         self.start_http(self.port).await;
         if self.opts.connect && self.settings.bool("device/autoConnect", true) {
-            self.add_log(format!("подключение к {}…", self.mac));
+            self.add_log(tr!("log.connecting", mac = self.mac));
             self.worker.set_want_connected(true);
         }
         // platform services
@@ -536,7 +539,7 @@ impl Controller {
             Err(e) => {
                 self.listening = false;
                 self.port_busy = true;
-                self.add_log(format!("HTTP-сервер: порт {port} занят ({e})"));
+                self.add_log(tr!("log.http_port_busy", port = port, error = e));
             }
         }
     }
@@ -595,9 +598,9 @@ impl Controller {
             }
             Msg::Capture(e) => self.capture_event(e),
             Msg::Notification(n) => match n {
-                Ok(n) => self.on_notification(&n.app, &n.summary, &n.body, &n.icon),
+                Ok(n) => self.on_notification(&n),
                 Err(e) => {
-                    self.add_log(format!("уведомления: {e}"));
+                    self.add_log(tr!("log.notifications_error", error = e));
                     self.notify_error = Some(e);
                 }
             },
@@ -605,8 +608,8 @@ impl Controller {
             Msg::Battery(info) => self.on_battery(info),
             Msg::AudioConnect(r) => {
                 match r {
-                    Ok(()) => self.add_log("аудио подключено"),
-                    Err(e) => self.add_log(format!("аудио: {e}")),
+                    Ok(()) => self.add_log(tr!("log.audio_connected")),
+                    Err(e) => self.add_log(tr!("log.audio_error", error = e)),
                 }
                 self.start_timer(TimerKind::Battery, 3000);
             }
@@ -614,7 +617,7 @@ impl Controller {
                 self.discovering = false;
                 match r {
                     Ok(list) => self.discovered = list,
-                    Err(e) => self.add_log(format!("поиск: {e}")),
+                    Err(e) => self.add_log(tr!("log.discovery_error", error = e)),
                 }
             }
             Msg::GalleryThumb(id, frame) => {
@@ -634,7 +637,7 @@ impl Controller {
             Msg::PortalRestart(r) => {
                 match r {
                     Ok(()) => self.screen.error = None,
-                    Err(e) => self.screen.error = Some(format!("не удалось перезапустить портал: {e}")),
+                    Err(e) => self.screen.error = Some(tr!("app.portal_restart_failed", error = e)),
                 }
                 let tx = self.tx.clone();
                 self.rt.spawn(async move {
@@ -657,12 +660,12 @@ impl Controller {
                 Ok(()) => {
                     self.listening = true;
                     self.port_busy = false;
-                    self.add_log(format!("HTTP-сервер: 127.0.0.1:{port}"));
+                    self.add_log(tr!("log.http_listening", port = port));
                 }
                 Err(e) => {
                     self.listening = false;
                     self.port_busy = true;
-                    self.add_log(format!("HTTP-сервер: порт {port} занят ({e})"));
+                    self.add_log(tr!("log.http_port_busy", port = port, error = e));
                 }
             },
         }
@@ -724,6 +727,26 @@ impl Controller {
         }
     }
 
+    fn apply_formats(&mut self) {
+        crate::i18n::set_formats(&self.settings.string("ui/timeFormat", "auto"), &self.settings.string("ui/dateFormat", "auto"));
+        self.relocalize();
+    }
+
+    /// The language or a date/time format changed: live modes and the Claude scene are drawn
+    /// again (the window and the tray read texts on every repaint).
+    fn relocalize(&mut self) {
+        let sessions = self.claude.sessions();
+        for id in self.modes.ids() {
+            if self.modes.running(id) {
+                let fx = self.modes.refresh(id, &mut self.settings, &sessions);
+                self.handle_fx(id, fx);
+            }
+        }
+        if self.mode == DisplayMode::Claude {
+            self.apply_claude_state();
+        }
+    }
+
     fn handle_fx(&mut self, id: &'static str, fx: HostEffects) {
         for l in fx.logs {
             self.add_log(l);
@@ -741,7 +764,7 @@ impl Controller {
     fn add_log(&mut self, line: impl Into<String>) {
         let line = line.into();
         eprintln!("[minitoo] {line}");
-        self.log.push_front(format!("{}  {line}", Local::now().format("%H:%M:%S")));
+        self.log.push_front(format!("{}  {line}", crate::i18n::time_hms(&Local::now())));
         self.log.truncate(200);
         self.log_arc = Arc::new(self.log.iter().cloned().collect());
     }
@@ -849,7 +872,7 @@ impl Controller {
         if interesting {
             let mut raw = vec![0x01];
             raw.extend_from_slice(&f.raw);
-            self.frames_log.push_front(format!("{} {}", Local::now().format("%H:%M:%S"), protocol::hex(&f.raw)));
+            self.frames_log.push_front(format!("{} {}", crate::i18n::time_hms(&Local::now()), protocol::hex(&f.raw)));
             self.frames_log.truncate(100);
         }
     }
@@ -878,7 +901,7 @@ impl Controller {
             if ok {
                 self.live_frames_sent += 1;
                 let title = self.device_live().and_then(|m| self.modes.get(m)).map(|s| s.mode.title()).unwrap_or("");
-                self.last_transfer = format!("{title}: {} КБ, {ms} мс", kb(bytes));
+                self.last_transfer = tr!("app.transfer.live", title = title, kb = kb(bytes), ms = ms);
             }
             if self.live_pending && self.device_live().is_some() && !self.overlay_active && !self.interrupted {
                 self.submit_live();
@@ -886,11 +909,11 @@ impl Controller {
         } else if id == self.stream_job {
             self.mark_delivered(bytes, ok);
             if ok {
-                self.last_transfer = format!("трансляция: {} КБ/кадр, {ms} мс", kb(bytes));
+                self.last_transfer = tr!("app.transfer.stream", kb = kb(bytes), ms = ms);
             }
         } else if ok {
-            self.last_transfer = format!("{} КБ, {frames} кадр., {ms} мс", kb(bytes));
-            self.add_log(format!("отправлено: {}", self.last_transfer));
+            self.last_transfer = trn!("app.transfer.media", frames, kb = kb(bytes), ms = ms);
+            self.add_log(tr!("log.sent", transfer = self.last_transfer));
         }
     }
 
@@ -1027,7 +1050,7 @@ impl Controller {
         self.stop_timer(TimerKind::RotationTick);
         self.activate_live(id);
         let title = self.modes.get(id).map(|s| s.mode.title()).unwrap_or("");
-        self.add_log(format!("режим: {title}"));
+        self.add_log(tr!("log.mode", title = title));
     }
 
     fn activate_live(&mut self, id: &'static str) {
@@ -1059,11 +1082,11 @@ impl Controller {
             return;
         }
         if self.rotation.count() > 1 {
-            self.add_log(format!("ротация: {} реж., каждые {} с", self.rotation.count(), self.rotation.interval()));
+            self.add_log(trn!("log.rotation", self.rotation.count(), secs = self.rotation.interval()));
         } else {
             let first = self.rotation.members()[0].clone();
             let title = self.modes.get(&first).map(|s| s.mode.title()).unwrap_or("");
-            self.add_log(format!("режим: {title}"));
+            self.add_log(tr!("log.mode", title = title));
         }
         let cur = if self.mode == DisplayMode::Live { self.active_live.unwrap_or("") } else { "" }.to_string();
         let fx = self.rotation.start(&cur);
@@ -1174,7 +1197,7 @@ impl Controller {
                         }
                         self.faces.custom.insert(state, (Arc::new(frames), avg_delay(&delays)));
                     }
-                    Err(e) => self.add_log(format!("не удалось открыть {path}: {e}")),
+                    Err(e) => self.add_log(tr!("app.open_failed", file = path, error = e)),
                 }
             }
             let enabled = self.enabled_variants(state);
@@ -1346,7 +1369,7 @@ impl Controller {
         let sessions = self.claude.sessions();
         if away {
             self.save_idle_content();
-            self.add_log(format!("экран заблокирован: часы, яркость {}%", self.away_brightness));
+            self.add_log(tr!("log.screen_locked", percent = self.away_brightness));
             self.away = true;
             let fx = self.modes.acquire("clock", &mut self.settings, &sessions);
             self.handle_fx("clock", HostEffects { device_changed: false, ..fx });
@@ -1359,7 +1382,7 @@ impl Controller {
             }
             self.apply_claude_state();
         } else {
-            self.add_log("экран разблокирован");
+            self.add_log(tr!("log.screen_unlocked"));
             self.away = false;
             self.send_brightness(self.brightness);
             if self.mode == DisplayMode::Claude {
@@ -1381,7 +1404,8 @@ impl Controller {
         })));
     }
 
-    fn on_notification(&mut self, app: &str, summary: &str, body: &str, icon: &str) {
+    fn on_notification(&mut self, n: &notifications::DesktopNotification) {
+        let (app, summary, body) = (n.app.as_str(), n.summary.as_str(), n.body.as_str());
         if !self.notify_enabled || app == "MiniToo Studio" {
             return;
         }
@@ -1389,8 +1413,8 @@ impl Controller {
         if self.notify_ignore.iter().any(|i| !i.trim().is_empty() && app_l.contains(&i.trim().to_lowercase())) {
             return;
         }
-        self.add_log(format!("уведомление: {app} — {summary}"));
-        let card = notify_card::render(app, summary, body, icon, &Local::now().format("%H:%M").to_string());
+        self.add_log(tr!("log.notification", app = app, text = summary));
+        let card = notify_card::render(app, summary, body, &n.icon, &crate::i18n::time_hm(&Local::now()));
         self.show_overlay(card, self.notify_duration as u64 * 1000);
     }
 
@@ -1401,7 +1425,7 @@ impl Controller {
         if info.percent != self.battery || info.audio_connected != self.audio_connected {
             if let Some(p) = info.percent {
                 if Some(p) != self.battery {
-                    self.add_log(format!("заряд колонки: {p}%"));
+                    self.add_log(tr!("log.battery", percent = p));
                 }
             }
             self.battery = info.percent;
@@ -1432,8 +1456,8 @@ impl Controller {
             Ok(a) => a,
             Err(e) => {
                 let name = path.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-                self.add_log(format!("не удалось открыть {name}: {e}"));
-                self.image_error = Some(format!("не удалось открыть {name}: {e}"));
+                self.add_log(tr!("app.open_failed", file = name, error = e));
+                self.image_error = Some(tr!("app.open_failed", file = name, error = e));
                 return;
             }
         };
@@ -1565,7 +1589,7 @@ impl Controller {
         self.interrupted = false;
         self.last_manual = Some(Content::new(frames.clone(), speed));
         self.set_mode(DisplayMode::Image);
-        self.add_log(format!("отправка {name} ({} кадр.)", frames.len()));
+        self.add_log(trn!("log.sending", frames.len(), name = name));
         let level = self.zstd_level();
         self.submit(frames.clone(), speed, level, ColorDepth::Full, false);
         let mut id = self.image.as_ref().map(|d| d.id.clone()).unwrap_or_default();
@@ -1588,7 +1612,7 @@ impl Controller {
         let Some(first) = paths.first().cloned() else { return };
         if first.is_dir() || paths.len() > 1 {
             let added = self.gallery.add_paths(&paths);
-            self.add_log(format!("в галерею добавлено: {}", added.len()));
+            self.add_log(tr!("log.gallery_added", count = added.len()));
             self.gallery_changed = true;
             self.schedule_gallery_save();
             self.request_missing_thumbs();
@@ -1837,7 +1861,7 @@ impl Controller {
 
             Command::Connect(on) => {
                 if on {
-                    self.add_log(format!("подключение к {}…", self.mac));
+                    self.add_log(tr!("log.connecting", mac = self.mac));
                     self.worker.set_want_connected(true);
                 } else {
                     self.set_streaming(false);
@@ -1873,7 +1897,7 @@ impl Controller {
             }
             Command::SyncTime => {
                 self.command_bytes(0x18, protocol::time_args(&Local::now().naive_local()));
-                self.add_log("время колонки синхронизировано");
+                self.add_log(tr!("log.time_synced"));
             }
             Command::Builtin(b) => match b {
                 Builtin::Cosmonaut => self.send_json(json!({"Command": "Lyric/Enter"})),
@@ -1889,8 +1913,8 @@ impl Controller {
                 self.command_bytes(0x72, vec![0x01, 0x01, r[0], r[1], b[0], b[1]]);
             }
             Command::DeviceNotifyCard { app, text } => {
-                self.add_log(format!("уведомление: {app} — {text}"));
-                let card = notify_card::render(&app, "", &text, &app.to_lowercase(), &Local::now().format("%H:%M").to_string());
+                self.add_log(tr!("log.notification", app = app, text = text));
+                let card = notify_card::render(&app, "", &text, &app.to_lowercase(), &crate::i18n::time_hm(&Local::now()));
                 self.show_overlay(card, self.notify_duration as u64 * 1000);
             }
             Command::DeviceNotifyIcon { app } => {
@@ -1907,14 +1931,14 @@ impl Controller {
                     self.add_log(format!("→ {}", protocol::hex(&all)));
                     self.command_bytes(cmd, args);
                 }
-                None => self.add_log(format!("неверный hex: {text}")),
+                None => self.add_log(tr!("log.bad_hex", text = text)),
             },
             Command::ConnectAudio => {
                 if !self.bluez_found {
-                    self.add_log("колонка не найдена в BlueZ");
+                    self.add_log(tr!("log.bluez_not_found"));
                     return;
                 }
-                self.add_log("подключаю колонку как аудиоустройство (для данных о заряде)…");
+                self.add_log(tr!("log.connecting_audio"));
                 let (mac, tx) = (self.mac.clone(), self.tx.clone());
                 self.rt.spawn(async move {
                     let r = bluez::connect_audio(mac).await;
@@ -1977,13 +2001,28 @@ impl Controller {
             Command::SetZstdLevel(v) => self.settings.set_int("device/zstdLevel", v.clamp(1, 22) as i64),
             Command::SetCloseToTray(v) => self.settings.set_bool("ui/closeToTray", v),
             Command::SetStartHidden(v) => self.settings.set_bool("ui/startHidden", v),
+            Command::SetLanguage(code) => {
+                let code = if code.trim().is_empty() { "auto".to_string() } else { code.trim().to_string() };
+                self.settings.set_string("ui/language", &code);
+                self.language_used = crate::i18n::set_language(&code);
+                self.relocalize();
+            }
+            Command::SetTimeFormat(v) => {
+                self.settings.set_string("ui/timeFormat", &v);
+                self.apply_formats();
+            }
+            Command::SetDateFormat(v) => {
+                let v = if v.trim().is_empty() { "auto".to_string() } else { v };
+                self.settings.set_string("ui/dateFormat", &v);
+                self.apply_formats();
+            }
 
             Command::OpenFiles(paths) => self.open_files(paths),
             Command::AddPaths(paths) => {
                 let single_file = paths.len() == 1 && paths[0].is_file();
                 let added = self.gallery.add_paths(&paths);
                 if !single_file {
-                    self.add_log(format!("в галерею добавлено: {}", added.len()));
+                    self.add_log(tr!("log.gallery_added", count = added.len()));
                 }
                 self.gallery_changed = true;
                 self.schedule_gallery_save();
@@ -2159,7 +2198,12 @@ impl Controller {
             Command::TestNotification => {
                 let was = self.notify_enabled;
                 self.notify_enabled = true;
-                self.on_notification("Telegram", "Анна", "Созвон переносим на 20:30, ок?", "telegram");
+                self.on_notification(&notifications::DesktopNotification {
+                    app: "Telegram".into(),
+                    summary: tr!("app.test_notification.summary").into(),
+                    body: tr!("app.test_notification.body").into(),
+                    ..Default::default()
+                });
                 self.notify_enabled = was;
             }
 
@@ -2210,7 +2254,7 @@ impl Controller {
                 match path {
                     Some(p) => {
                         if media::load(&p, 1).is_err() {
-                            self.add_log(format!("не удалось открыть {}", p.display()));
+                            self.add_log(tr!("app.open_failed_file", file = p.display()));
                             return;
                         }
                         self.settings.set_string(&key, &p.to_string_lossy());
@@ -2250,7 +2294,7 @@ impl Controller {
             Command::InstallHooks => {
                 let r = claude::install_hooks(self.port);
                 match &r {
-                    Ok(_) => self.add_log("хуки Claude Code установлены"),
+                    Ok(_) => self.add_log(tr!("log.hooks_installed")),
                     Err(e) => self.add_log(e.clone()),
                 }
                 self.hooks_message = Some(match r {
@@ -2262,7 +2306,7 @@ impl Controller {
             Command::UninstallHooks => {
                 let r = claude::uninstall_hooks();
                 if r.is_ok() {
-                    self.add_log("хуки Claude Code удалены");
+                    self.add_log(tr!("log.hooks_removed"));
                 }
                 self.hooks_message = Some(match r {
                     Ok(m) => (true, m),
@@ -2352,8 +2396,8 @@ impl Controller {
                 let v = body_json();
                 let s = |k: &str, d: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or(d).to_string();
                 let (app, summary, body, icon) = (s("app", "minitoo"), s("summary", ""), s("body", ""), s("icon", ""));
-                self.add_log(format!("уведомление: {app} — {summary}"));
-                let card = notify_card::render(&app, &summary, &body, &icon, &Local::now().format("%H:%M").to_string());
+                self.add_log(tr!("log.notification", app = app, text = summary));
+                let card = notify_card::render(&app, &summary, &body, &icon, &crate::i18n::time_hm(&Local::now()));
                 self.show_overlay(card, self.notify_duration as u64 * 1000);
                 Response::ok()
             }
@@ -2381,16 +2425,16 @@ impl Controller {
 
     fn tray_state_now(&self) -> tray::TrayState {
         let dev = match self.conn {
-            Conn::Connected => "подключена",
-            Conn::Connecting => "подключение…",
-            Conn::Disconnected => "нет связи",
+            Conn::Connected => tr!("app.tray.connected"),
+            Conn::Connecting => tr!("app.tray.connecting"),
+            Conn::Disconnected => tr!("app.tray.disconnected"),
         };
         let mode_name = match self.mode {
-            DisplayMode::Idle => "ожидание",
-            DisplayMode::Image => "изображение",
-            DisplayMode::Screen => "трансляция экрана",
-            DisplayMode::Claude => "статус Claude",
-            DisplayMode::Live => "живой режим",
+            DisplayMode::Idle => tr!("app.mode.idle"),
+            DisplayMode::Image => tr!("app.mode.image"),
+            DisplayMode::Screen => tr!("app.mode.screen"),
+            DisplayMode::Claude => tr!("app.mode.claude"),
+            DisplayMode::Live => tr!("app.mode.live"),
         };
         let state = self.claude.state();
         let mut screen = crate::color::Color::hex(0xd97757);
@@ -2406,7 +2450,7 @@ impl Controller {
         }
         tray::TrayState {
             screen,
-            tooltip: format!("MiniToo Studio\nКолонка: {dev}\nРежим: {mode_name}\nClaude: {}", state.id()),
+            tooltip: tr!("app.tray.tooltip", device = dev, mode = mode_name, state = state.id()),
             claude_mode: self.mode == DisplayMode::Claude,
             streaming: self.screen.streaming,
         }
@@ -2428,40 +2472,40 @@ impl Controller {
             Some(1) => "FM".into(),
             Some(2) => "Line-in".into(),
             Some(3) => "SD".into(),
-            Some(n) => format!("режим {n}"),
+            Some(n) => tr!("app.reported.source_mode", n = n),
             None => dash(),
         };
         let sd = match info.get("sdCard").and_then(|v| v.as_i64()) {
-            Some(0) => "нет".into(),
-            Some(_) => "есть".into(),
+            Some(0) => tr!("app.reported.sd_none").into(),
+            Some(_) => tr!("app.reported.sd_present").into(),
             None => dash(),
         };
         let num = |k: &str| conf.get(k).and_then(|v| v.as_i64().or_else(|| v.as_bool().map(|b| b as i64)));
         let off = match num("AutoPowerOff") {
-            Some(0) => "выключено".into(),
-            Some(n) => format!("{n} мин"),
+            Some(0) => tr!("app.reported.off").into(),
+            Some(n) => tr!("app.reported.minutes", n = n),
             None => dash(),
         };
         let t24 = match num("Time24Flag") {
-            Some(0) => "12 ч".into(),
-            Some(_) => "24 ч".into(),
+            Some(0) => tr!("app.reported.hours12").into(),
+            Some(_) => tr!("app.reported.hours24").into(),
             None => dash(),
         };
         let auto = match num("BluetoothAutoConnect") {
-            Some(0) => "нет".into(),
-            Some(_) => "да".into(),
+            Some(0) => tr!("app.reported.no").into(),
+            Some(_) => tr!("app.reported.yes").into(),
             None => dash(),
         };
-        let sound = num("NotificationSound").map(|n| format!("№ {n}")).unwrap_or_else(dash);
+        let sound = num("NotificationSound").map(|n| tr!("app.reported.sound_number", n = n)).unwrap_or_else(dash);
         vec![
-            ("Громкость".into(), volume),
-            ("Яркость".into(), brightness),
-            ("Источник звука".into(), source),
-            ("SD-карта".into(), sd),
-            ("Автовыключение".into(), off),
-            ("Формат времени".into(), t24),
-            ("Автоподключение".into(), auto),
-            ("Звук уведомлений".into(), sound),
+            (tr!("app.reported.volume").into(), volume),
+            (tr!("app.reported.brightness").into(), brightness),
+            (tr!("app.reported.source").into(), source),
+            (tr!("app.reported.sd_card").into(), sd),
+            (tr!("app.reported.auto_off").into(), off),
+            (tr!("app.reported.time_format").into(), t24),
+            (tr!("app.reported.auto_connect").into(), auto),
+            (tr!("app.reported.notify_sound").into(), sound),
         ]
     }
 
@@ -2491,11 +2535,11 @@ impl Controller {
             .collect();
         let next_title = self.modes.get(&self.rotation.next_id()).map(|s| s.mode.title().to_string()).unwrap_or_default();
         let mode_text = match self.mode {
-            DisplayMode::Live => self.active_live.and_then(|id| self.modes.get(id)).map(|s| s.mode.title()).unwrap_or("живой режим"),
-            DisplayMode::Idle => "ничего (ожидание)",
-            DisplayMode::Image => "изображение",
-            DisplayMode::Screen => "трансляция экрана",
-            DisplayMode::Claude => "статус Claude",
+            DisplayMode::Live => self.active_live.and_then(|id| self.modes.get(id)).map(|s| s.mode.title()).unwrap_or(tr!("app.mode.live")),
+            DisplayMode::Idle => tr!("app.on_screen.idle"),
+            DisplayMode::Image => tr!("app.mode.image"),
+            DisplayMode::Screen => tr!("app.mode.screen"),
+            DisplayMode::Claude => tr!("app.mode.claude"),
         };
         // the UI prefixes «На экране: » and appends the Claude alert itself
         let on_screen = mode_text.to_string();
@@ -2551,6 +2595,10 @@ impl Controller {
                 zstd_level: self.zstd_level(),
                 close_to_tray: self.settings.bool("ui/closeToTray", true),
                 start_hidden: self.settings.bool("ui/startHidden", false),
+                language: self.settings.string("ui/language", "auto"),
+                language_used: self.language_used.clone(),
+                time_format: self.settings.string("ui/timeFormat", "auto"),
+                date_format: self.settings.string("ui/dateFormat", "auto"),
             },
             image: ImageState {
                 source: self.image.as_ref().map(|d| d.source.clone()),

@@ -152,7 +152,7 @@ impl DeviceWorker {
 
     pub fn submit_command(&self, cmd: u8, args: Vec<u8>) {
         if protocol::FORBIDDEN_COMMANDS.contains(&cmd) {
-            (self.sink)(WorkerEvent::Log(format!("команда {cmd:#04x} не отправлена: она вешает колонку")));
+            (self.sink)(WorkerEvent::Log(tr!("worker.command_forbidden", cmd = format!("{cmd:#04x}"))));
             return;
         }
         let (m, cv) = &*self.shared;
@@ -240,7 +240,7 @@ impl Loop {
         match link.send(&protocol::make_message(cmd, args)) {
             Ok(()) => true,
             Err(e) => {
-                self.log(format!("ошибка отправки: {e}"));
+                self.log(tr!("worker.send_error", error = e));
                 false
             }
         }
@@ -269,7 +269,7 @@ impl Loop {
     fn send_media(&mut self, job: &MediaJob, chunk_delay: u64) -> Result<(usize, usize), ()> {
         let media = protocol::encode_media(&job.frames, job.speed, job.level, job.depth);
         if media.payload.is_empty() {
-            self.log("не удалось закодировать изображение");
+            self.log(tr!("worker.encode_failed"));
             return Ok((0, 0));
         }
         let packets = protocol::media_packets(&media.payload);
@@ -290,7 +290,7 @@ impl Loop {
             }
         }
         if !asked {
-            self.log("колонка не запросила данные, отправляю всё равно");
+            self.log(tr!("worker.no_request"));
         }
         let mut budget = packets.len();
         let mut resent = 0;
@@ -332,7 +332,7 @@ impl Loop {
         }
         self.raw.clear();
         if resent > 0 {
-            self.log(format!("колонка запросила повторно {resent} из {} пакетов", packets.len() - 1));
+            self.log(tr!("worker.resent", resent = resent, total = packets.len() - 1));
         }
         Ok((media.payload.len(), media.frames))
     }
@@ -392,7 +392,7 @@ impl Loop {
             if !want {
                 if self.link.is_some() {
                     self.close();
-                    self.log("отключено");
+                    self.log(tr!("worker.disconnected"));
                 }
                 self.set_state(LinkState::Disconnected);
                 continue;
@@ -407,7 +407,7 @@ impl Loop {
                     Err(error) => {
                         backoff = if backoff == 0 { 2 } else { (backoff * 2).min(30) };
                         next_attempt = clock.elapsed() + Duration::from_secs(backoff);
-                        self.log(format!("нет связи с колонкой: {error} (повтор через {backoff} с)"));
+                        self.log(tr!("worker.no_link", error = error, secs = backoff));
                         self.set_state(LinkState::Disconnected);
                     }
                     Ok(link) => {
@@ -419,7 +419,7 @@ impl Loop {
                         self.raw.clear();
                         last_activity = Instant::now();
                         self.set_state(LinkState::Connected);
-                        self.log("подключено");
+                        self.log(tr!("worker.connected"));
                     }
                 }
                 continue;
@@ -470,7 +470,7 @@ impl Loop {
             if lost {
                 self.close();
                 self.set_state(LinkState::Disconnected);
-                self.log("связь потеряна, переподключаюсь");
+                self.log(tr!("worker.link_lost"));
                 next_attempt = Duration::ZERO;
                 if let Some(job) = media {
                     let dropped = {

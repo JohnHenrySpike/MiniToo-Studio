@@ -5,25 +5,14 @@ mod window;
 use minitoo::api::{Command, CoreHandle, Fit};
 use minitoo::app::{Controller, DEFAULT_MAC, DEFAULT_PORT, StartOptions};
 use minitoo::settings::Settings;
+use minitoo::tr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-const HELP: &str = "\
-MiniToo Studio — экран колонки Divoom MiniToo
-
-  minitoo-studio                      окно + трей
-  minitoo-studio --hidden             сразу в трей
-  minitoo-studio --headless           без окна и трея (только колонка и HTTP API)
-  minitoo-studio --send f.gif [--fit crop|fit|stretch]   через запущенное приложение, иначе напрямую
-  minitoo-studio --mode claude|idle   переключить запущенное приложение
-  minitoo-studio --state working|alerting|chilling
-  minitoo-studio --status             JSON /status
-  minitoo-studio --no-device          не подключаться при запуске
-  minitoo-studio --image f.png        открыть картинку при запуске
-  minitoo-studio --debug              журнал в правой панели, диагностика протокола, «пульс»
-  minitoo-studio --screenshot DIR     (отладка) снимки всех страниц в обеих темах, без колонки
-";
+fn help() -> &'static str {
+    tr!("cli.help")
+}
 
 #[derive(Default)]
 struct Args {
@@ -45,7 +34,7 @@ fn parse_args() -> Result<Args, String> {
     let mut a = Args::default();
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
-        let mut value = |name: &str| it.next().ok_or_else(|| format!("{name}: нужно значение"));
+        let mut value = |name: &str| it.next().ok_or_else(|| tr!("cli.needs_value", name = name));
         match arg.as_str() {
             "--hidden" => a.hidden = true,
             "--headless" => a.headless = true,
@@ -60,10 +49,10 @@ fn parse_args() -> Result<Args, String> {
             "--screenshot" => a.screenshot = Some(PathBuf::from(value("--screenshot")?)),
             "--export-faces" => a.export_faces = Some(PathBuf::from(value("--export-faces")?)),
             "-h" | "--help" => {
-                print!("{HELP}");
+                print!("{}", help());
                 std::process::exit(0);
             }
-            other => return Err(format!("неизвестный аргумент: {other}")),
+            other => return Err(tr!("cli.unknown_arg", arg = other)),
         }
     }
     Ok(a)
@@ -89,21 +78,23 @@ fn post(port: u16, path: &str, body: &[u8]) -> Option<(u16, Vec<u8>)> {
 }
 
 fn main() {
+    let had_config = minitoo::settings::config_path().exists();
+    let mut settings = Settings::load();
+    minitoo::i18n::init(&mut settings, had_config);
     let args = match parse_args() {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("{e}\n\n{HELP}");
+            eprintln!("{e}\n\n{}", help());
             std::process::exit(2);
         }
     };
     static LOGGER: StderrLog = StderrLog;
     let _ = log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info));
-    let settings = Settings::load();
     let port = settings.int_in("claude/port", DEFAULT_PORT as i64, 1024, 65535) as u16;
 
     if let Some(dir) = &args.export_faces {
         match minitoo::faces::export_faces(dir) {
-            Ok(()) => println!("сцены записаны в {}", dir.display()),
+            Ok(()) => println!("{}", tr!("cli.scenes_written", dir = dir.display())),
             Err(e) => {
                 eprintln!("{e}");
                 std::process::exit(1);
@@ -117,7 +108,7 @@ fn main() {
         match minitoo::http::request(port, "GET", "/status", b"", Duration::from_secs(5)) {
             Some((_, body)) => println!("{}", String::from_utf8_lossy(&body)),
             None => {
-                eprintln!("MiniToo Studio не запущено (порт {port})");
+                eprintln!("{}", tr!("cli.not_running", port = port));
                 std::process::exit(1);
             }
         }
@@ -125,7 +116,7 @@ fn main() {
     }
     if let Some(mode) = &args.mode {
         if post(port, &format!("/mode/{mode}"), b"").is_none() {
-            eprintln!("MiniToo Studio не запущено (порт {port})");
+            eprintln!("{}", tr!("cli.not_running", port = port));
             std::process::exit(1);
         }
         return;
@@ -138,7 +129,7 @@ fn main() {
                 std::process::exit(1);
             }
             None => {
-                eprintln!("MiniToo Studio не запущено (порт {port})");
+                eprintln!("{}", tr!("cli.not_running", port = port));
                 std::process::exit(1);
             }
         }
@@ -264,7 +255,7 @@ fn send_direct(settings: &Settings, path: &std::path::Path, fit: Fit) -> i32 {
                     println!("sent: {bytes} bytes, {frames} frames, {ms} ms");
                     return 0;
                 }
-                eprintln!("не отправлено");
+                eprintln!("{}", tr!("cli.not_sent"));
                 return 1;
             }
             Ok(WorkerEvent::Log(l)) => eprintln!("{l}"),
@@ -272,6 +263,6 @@ fn send_direct(settings: &Settings, path: &std::path::Path, fit: Fit) -> i32 {
         }
     }
     worker.shutdown();
-    eprintln!("таймаут: колонка не ответила за 60 с");
+    eprintln!("{}", tr!("cli.timeout"));
     1
 }

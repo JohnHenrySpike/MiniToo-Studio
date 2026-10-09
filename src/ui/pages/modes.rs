@@ -51,31 +51,31 @@ fn rotation_box(ui: &mut Ui, cx: &mut Cx) {
         w::row(ui, 33.0, 6.0, |ui| {
             let c = if rot.running { p.accent_text } else { p.text };
             w::pixel_icon(ui, "refresh", 1, c, None);
-            w::pixel_text(ui, "Ротация", PixStyle::new(12), c);
+            w::pixel_text(ui, tr!("modes.rotation.title"), PixStyle::new(12), c);
             w::right(ui, |ui| {
-                let fmt = |v: i64| format!("{v} с");
+                let fmt = |v: i64| tr!("modes.rotation.interval_value", v = v);
                 let before = ui.cursor().right();
                 if let Some(v) = Spin::new("rot-interval", rot.interval as i64, 10, 600).step(5).width(124.0).fmt(&fmt).show(ui) {
                     cx.send(Command::SetRotationInterval(v as u32));
                 }
                 let r = Rect::from_min_max(pos2(ui.cursor().right(), ui.min_rect().top()), pos2(before, ui.min_rect().bottom()));
                 let resp = ui.interact(r, ui.id().with("rot-tip"), Sense::hover());
-                w::tip(resp, "Сколько секунд показывать каждый режим");
+                w::tip(resp, tr!("modes.rotation.interval_tip"));
             });
         });
         w::row(ui, 33.0, 6.0, |ui| {
             let next_w = if cycling { 40.0 + 6.0 } else { 0.0 };
-            let key = Key::new(if rot.running { "Ротация идёт" } else { "Запустить ротацию" })
+            let key = Key::new(if rot.running { tr!("modes.rotation.running") } else { tr!("modes.rotation.start") })
                 .icon(if rot.running { "check" } else { "play" })
                 .accent(!rot.running)
                 .checked(rot.running)
                 .enabled(rot.running || rot.checked > 0)
                 .width(ui.available_width() - next_w)
-                .tip(if rot.running { "Остановить ротацию — текущий режим останется на колонке" } else { "Показывать отмеченные режимы по очереди" });
+                .tip(if rot.running { tr!("modes.rotation.stop_tip") } else { tr!("modes.rotation.start_tip") });
             if key.show(ui).clicked() {
                 cx.send(if rot.running { Command::StopRotation } else { Command::StartRotation });
             }
-            if cycling && Key::icon_only("next").tip("Следующий режим сейчас").show(ui).clicked() {
+            if cycling && Key::icon_only("next").tip(tr!("modes.rotation.next_tip")).show(ui).clicked() {
                 cx.send(Command::RotationNext);
             }
         });
@@ -84,19 +84,19 @@ fn rotation_box(ui: &mut Ui, cx: &mut Cx) {
             w::progress(ui, rot.progress.clamp(0.0, 1.0), w_, if rot.paused { p.text_dim } else { p.accent });
         }
         let text = if rot.checked == 0 {
-            "Отметьте галочкой режимы, которые будут сменять друг друга на колонке.".to_string()
+            tr!("modes.rotation.hint_none").to_string()
         } else if !rot.running {
             if rot.checked == 1 {
-                "Отмечен один режим — он будет просто показан. Отметьте ещё, чтобы они сменялись.".into()
+                tr!("modes.rotation.hint_one").into()
             } else {
-                format!("Отмечено режимов: {}. Порядок — как в списке.", rot.checked)
+                trn!("modes.rotation.hint_checked", rot.checked)
             }
         } else if rot.checked == 1 {
-            "Отмечен один режим — показывается без смены.".into()
+            tr!("modes.rotation.hint_one_running").into()
         } else if rot.paused {
-            "Пауза: поверх показывается уведомление или сигнал Claude.".into()
+            tr!("modes.rotation.hint_paused").into()
         } else {
-            format!("Дальше «{}» через {}", rot.next_title, mmss(rot.seconds_left))
+            tr!("modes.rotation.hint_next", title = rot.next_title, time = mmss(rot.seconds_left))
         };
         w::hint_small(ui, &text, 11.0);
     });
@@ -135,7 +135,7 @@ fn mode_row(ui: &mut Ui, cx: &mut Cx, d: &RowData, current: bool) -> (bool, bool
         if d.live {
             let lr = Rect::from_min_size(pos2(thumb.right() - 7.0, thumb.top() - 1.0), vec2(8.0, 8.0));
             w::paint_led(&painter, lr, p.accent, true, 1.0);
-            w::tip(ui.interact(lr.expand(2.0), id.with("led"), Sense::hover()), "Сейчас на колонке");
+            w::tip(ui.interact(lr.expand(2.0), id.with("led"), Sense::hover()), tr!("modes.row.live_tip"));
         }
     } else {
         pixel::paint_icon_centered(&painter, thumb.center(), "bell", 3, p.text, None);
@@ -169,7 +169,7 @@ fn mode_row(ui: &mut Ui, cx: &mut Cx, d: &RowData, current: bool) -> (bool, bool
         if m.in_rotation {
             pixel::paint_icon(&painter, b.center() - vec2(6.0, 6.0), "check", 1, WHITE, None);
         }
-        let cresp = w::tip(cresp, if m.in_rotation { "В ротации — убрать" } else { "Добавить в ротацию" });
+        let cresp = w::tip(cresp, if m.in_rotation { tr!("modes.row.rotation_remove") } else { tr!("modes.row.rotation_add") });
         toggled = cresp.clicked();
     }
     (resp.clicked() && !toggled, toggled)
@@ -197,11 +197,11 @@ fn mode_list(ui: &mut Ui, cx: &mut Cx, st: &mut State, selected: &str, rect: Rec
             w::separator(ui, 8.0);
             ui.horizontal(|ui| {
                 ui.add_space(10.0);
-                w::pixel_text(ui, "ПОВЕРХ РЕЖИМОВ", PixStyle::new(9).spacing(1), p.text_dim);
+                w::pixel_text(ui, tr!("modes.list.overlays"), PixStyle::new(9).spacing(1), p.text_dim);
             });
             let n = &snap.notify;
-            let status = if n.enabled { format!("включены, {} с", n.duration) } else { "выключены".into() };
-            let d = RowData { id: NOTIFY, title: "Уведомления", status, mode: None, live: false };
+            let status = if n.enabled { tr!("modes.notify.status_on", sec = n.duration) } else { tr!("modes.notify.status_off").into() };
+            let d = RowData { id: NOTIFY, title: tr!("modes.notify.title"), status, mode: None, live: false };
             if mode_row(ui, cx, &d, selected == NOTIFY).0 {
                 st.selected = Some(NOTIFY.to_string());
             }
@@ -240,25 +240,22 @@ fn mode_card(ui: &mut Ui, cx: &mut Cx, m: &ModeInfo) {
             }
             ui.add_space(6.0);
             let text = if on_device {
-                if rotating { "На колонке, идёт ротация" } else { "Показывается на колонке" }
+                if rotating { tr!("modes.card.on_device_rotating") } else { tr!("modes.card.on_device") }
             } else if rotating {
-                "Показать только этот режим"
+                tr!("modes.card.show_only")
             } else {
-                "Показать на колонке"
+                tr!("modes.card.show")
             };
             let key = Key::new(text).icon(if on_device { "check" } else { "send" }).accent(!on_device).checked(on_device).height(42.0).width(ui.available_width());
             if key.show(ui).clicked() && !on_device {
                 cx.send(Command::ShowLive(m.id.to_string()));
             }
             let hint = if rotating && !on_device {
-                "Идёт ротация: выбор одного режима её остановит.".to_string()
+                tr!("modes.card.hint_rotating").to_string()
             } else if on_device {
-                format!(
-                    "Колонка получает новый кадр, только когда картинка меняется. {} вернётся после перезапуска приложения.",
-                    if rotating { "Ротация" } else { "Режим" }
-                )
+                (if rotating { tr!("modes.card.hint_on_device_rotation") } else { tr!("modes.card.hint_on_device_mode") }).to_string()
             } else {
-                "Предпросмотр живой: так режим будет выглядеть на колонке.".to_string()
+                tr!("modes.card.hint_preview").to_string()
             };
             w::hint_small(ui, &hint, 11.0);
         };
@@ -284,15 +281,16 @@ fn send_mode(cx: &Cx, id: &str, c: ModeCommand) {
 
 fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
     let p = pal();
-    let faces = [("Небо", None), ("Неон", None), ("Пиксели", None)];
-    let lw = w::text_width(ui, "Циферблат", w::font(13.0));
+    let faces = [(tr!("modes.clock.face_sky"), None), (tr!("modes.clock.face_neon"), None), (tr!("modes.clock.face_pixels"), None)];
+    let face_label = tr!("modes.clock.face");
+    let lw = w::text_width(ui, face_label, w::font(13.0));
     let picked = if lw + 10.0 + w::tabs_width(ui, &faces) <= ui.available_width() {
         w::row(ui, 33.0, 10.0, |ui| {
-            w::text(ui, "Циферблат", w::font(13.0), p.text);
+            w::text(ui, face_label, w::font(13.0), p.text);
             w::tabs(ui, &faces, v.style.clamp(0, 2) as usize)
         })
     } else {
-        w::text(ui, "Циферблат", w::font(13.0), p.text);
+        w::text(ui, face_label, w::font(13.0), p.text);
         w::tabs(ui, &faces, v.style.clamp(0, 2) as usize)
     };
     if let Some(i) = picked {
@@ -311,13 +309,13 @@ fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
                     }
                 }
                 None => {
-                    w::pixel_text(ui, "Город не выбран", PixStyle::new(12), p.text_dim);
+                    w::pixel_text(ui, tr!("modes.clock.no_city"), PixStyle::new(12), p.text_dim);
                 }
             }
         });
         if v.city.is_some() {
             w::right(ui, |ui| {
-                if Key::new("Убрать погоду").icon("close").flat().show(ui).clicked() {
+                if Key::new(tr!("modes.clock.remove_weather")).icon("close").flat().show(ui).clicked() {
                     send_mode(cx, "clock", ModeCommand::ClockClearCity);
                 }
             });
@@ -330,7 +328,7 @@ fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
     let mut field_resp = None;
     w::row(ui, 32.0, 8.0, |ui| {
         let width = ui.available_width() - if busy { 38.0 } else { 0.0 };
-        let hint = if v.city.is_some() { "Другой город…" } else { "Начните вводить название города…" };
+        let hint = if v.city.is_some() { tr!("modes.clock.search_other") } else { tr!("modes.clock.search_hint") };
         let r = w::text_field(ui, &mut st.city_query, Field { hint, width, id: Some(field_id), ..Default::default() });
         if busy {
             w::busy(ui);
@@ -395,8 +393,8 @@ fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
     let show_results = !v.results.is_empty() || (st.city_query.chars().count() >= 2 && !busy && !typed_pending);
     if show_results && !st.city_query.is_empty() || !v.results.is_empty() {
         let width = ui.available_width();
-        const NOTHING: &str = "Ничего не найдено. Попробуйте по-русски или по-английски.";
-        let nothing_h = w::galley_wrapped(ui, NOTHING, w::font(13.0), p.text_dim, width - 24.0).size().y;
+        let nothing = tr!("modes.clock.nothing_found");
+        let nothing_h = w::galley_wrapped(ui, nothing, w::font(13.0), p.text_dim, width - 24.0).size().y;
         let h = if v.results.is_empty() { nothing_h + 16.0 } else { v.results.len() as f32 * 32.0 } + 8.0;
         let (rect, _) = ui.allocate_exact_size(vec2(width, h), Sense::hover());
         w::well(ui.painter(), rect, 6.0, false);
@@ -406,7 +404,7 @@ fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
             ui.spacing_mut().item_spacing.y = 0.0;
             if v.results.is_empty() {
                 let r = Rect::from_min_size(inner.min + vec2(8.0, 8.0), vec2(inner.width() - 16.0, nothing_h));
-                area(ui, r, |ui| w::para(ui, NOTHING, w::font(13.0), p.text_dim));
+                area(ui, r, |ui| w::para(ui, nothing, w::font(13.0), p.text_dim));
             }
             for (i, c) in v.results.iter().enumerate() {
                 let label = if c.region.is_empty() { c.name.clone() } else { format!("{}  ·  {}", c.name, c.region) };
@@ -422,13 +420,13 @@ fn clock_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &ClockView) {
     if let Some(e) = &v.search_error {
         w::para(ui, e, w::font(13.0), p.danger);
     }
-    w::hint_small(ui, "Погода — Open-Meteo, без регистрации; обновляется раз в 15 минут.", 11.0);
+    w::hint_small(ui, tr!("modes.clock.weather_hint"), 11.0);
 }
 
 fn player_settings(ui: &mut Ui, cx: &mut Cx, v: &NowPlayingView) {
     let p = pal();
     if !v.available || v.player.is_empty() {
-        w::hint(ui, "Ни один плеер не запущен. Подойдёт любой с поддержкой MPRIS: браузер, Spotify, Elisa, VLC…");
+        w::hint(ui, tr!("modes.player.none"));
     } else {
         let track = match (v.artist.is_empty(), v.title.is_empty()) {
             (false, false) => format!("{} — {}", v.artist, v.title),
@@ -444,7 +442,7 @@ fn player_settings(ui: &mut Ui, cx: &mut Cx, v: &NowPlayingView) {
         if Key::icon_only("prev").enabled(on).show(ui).clicked() {
             send_mode(cx, "nowplaying", ModeCommand::Previous);
         }
-        let k = Key::new(if v.playing { "Пауза" } else { "Играть" }).icon(if v.playing { "pause" } else { "play" }).accent(true).enabled(on);
+        let k = Key::new(if v.playing { tr!("modes.player.pause") } else { tr!("modes.player.play") }).icon(if v.playing { "pause" } else { "play" }).accent(true).enabled(on);
         if k.show(ui).clicked() {
             send_mode(cx, "nowplaying", ModeCommand::PlayPause);
         }
@@ -462,22 +460,22 @@ fn label_col(ui: &mut Ui, text: &str, width: f32) {
 
 fn pomodoro_settings(ui: &mut Ui, cx: &mut Cx, v: &PomodoroView) {
     w::row(ui, 33.0, 8.0, |ui| {
-        let k = Key::new(if v.running { "Пауза" } else { "Старт" }).icon(if v.running { "pause" } else { "play" }).accent(true);
+        let k = Key::new(if v.running { tr!("modes.pomodoro.pause") } else { tr!("modes.pomodoro.start") }).icon(if v.running { "pause" } else { "play" }).accent(true);
         if k.show(ui).clicked() {
             send_mode(cx, "pomodoro", ModeCommand::PomodoroStartPause);
         }
-        if Key::new("Пропустить").icon("next").show(ui).clicked() {
+        if Key::new(tr!("modes.pomodoro.skip")).icon("next").show(ui).clicked() {
             send_mode(cx, "pomodoro", ModeCommand::PomodoroSkip);
         }
-        if Key::new("Сброс").icon("refresh").show(ui).clicked() {
+        if Key::new(tr!("modes.pomodoro.reset")).icon("refresh").show(ui).clicked() {
             send_mode(cx, "pomodoro", ModeCommand::PomodoroReset);
         }
     });
     type Row<'a> = (&'a str, &'a str, u32, i64, fn(u32) -> ModeCommand);
     let rows: [Row; 3] = [
-        ("Фокус, мин", "pomo-work", v.work_min, 180, ModeCommand::PomodoroWork),
-        ("Перерыв, мин", "pomo-break", v.break_min, 60, ModeCommand::PomodoroBreak),
-        ("Длинный перерыв, мин", "pomo-long", v.long_min, 90, ModeCommand::PomodoroLong),
+        (tr!("modes.pomodoro.work_min"), "pomo-work", v.work_min, 180, ModeCommand::PomodoroWork),
+        (tr!("modes.pomodoro.break_min"), "pomo-break", v.break_min, 60, ModeCommand::PomodoroBreak),
+        (tr!("modes.pomodoro.long_min"), "pomo-long", v.long_min, 90, ModeCommand::PomodoroLong),
     ];
     let lw = rows.iter().map(|r| w::text_width(ui, r.0, w::font(13.0))).fold(0.0, f32::max) + 12.0;
     ui.spacing_mut().item_spacing.y = 8.0;
@@ -492,7 +490,7 @@ fn pomodoro_settings(ui: &mut Ui, cx: &mut Cx, v: &PomodoroView) {
     }
     w::hint_small(
         ui,
-        "Длинный перерыв — после каждого четвёртого помидора. Когда этап заканчивается, на колонке на несколько секунд появляется карточка, даже если показывается другой режим.",
+        tr!("modes.pomodoro.hint"),
         11.0,
     );
 }
@@ -513,7 +511,7 @@ fn github_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &GithubView) {
                 w::pixel_text_elided(ui, &repo.name, PixStyle::new(12), p.text, avail);
                 w::text_elided(ui, &repo.detail, w::font(11.0), p.text_dim, Some(avail));
             });
-            if Key::icon_only("close").flat().tip("Убрать").show(ui).clicked() {
+            if Key::icon_only("close").flat().tip(tr!("modes.github.remove")).show(ui).clicked() {
                 send_mode(cx, "github", ModeCommand::GithubRemove(repo.name.clone()));
             }
         });
@@ -521,9 +519,9 @@ fn github_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &GithubView) {
     if v.repos.len() < 4 {
         let mut add = false;
         w::row(ui, 33.0, 8.0, |ui| {
-            let key = Key::new("Добавить").icon("plus");
+            let key = Key::new(tr!("modes.github.add")).icon("plus");
             let kw = key.size(ui).x;
-            let r = w::text_field(ui, &mut st.repo_input, Field { hint: "owner/repo или ссылка на GitHub", width: ui.available_width() - kw - 8.0, ..Default::default() });
+            let r = w::text_field(ui, &mut st.repo_input, Field { hint: tr!("modes.github.repo_hint"), width: ui.available_width() - kw - 8.0, ..Default::default() });
             if w::submitted(ui, &r) {
                 add = true;
             }
@@ -542,16 +540,16 @@ fn github_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &GithubView) {
     if v.repos.len() < 4 {
         let examples = ["cli/cli", "neovim/neovim", "rust-lang/rust", "microsoft/vscode"];
         let keys = examples.iter().map(|e| Key::new(e).flat()).collect();
-        if let Some(i) = w::flow_keys(ui, Some("Например:"), keys, 6.0) {
+        if let Some(i) = w::flow_keys(ui, Some(tr!("modes.github.examples")), keys, 6.0) {
             send_mode(cx, "github", ModeCommand::GithubAdd(examples[i].to_string()));
         }
     }
     w::separator(ui, 0.0);
     w::row(ui, 33.0, 8.0, |ui| {
-        let save = Key::new("Сохранить").enabled(!st.token_input.is_empty());
-        let del = Key::new("Удалить");
+        let save = Key::new(tr!("modes.github.token_save")).enabled(!st.token_input.is_empty());
+        let del = Key::new(tr!("modes.github.token_delete"));
         let kw = save.size(ui).x + if v.has_token { del.size(ui).x + 8.0 } else { 0.0 };
-        let hint = if v.has_token { "токен сохранён — введите новый, чтобы заменить" } else { "токен GitHub (нужен для приватных репозиториев)" };
+        let hint = if v.has_token { tr!("modes.github.token_saved_hint") } else { tr!("modes.github.token_hint") };
         w::text_field(ui, &mut st.token_input, Field { hint, width: ui.available_width() - kw - 8.0, password: true, ..Default::default() });
         if save.show(ui).clicked() {
             send_mode(cx, "github", ModeCommand::GithubToken(std::mem::take(&mut st.token_input)));
@@ -563,15 +561,13 @@ fn github_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State, v: &GithubView) {
     let mins = ((v.interval as f64) / 60.0).round().max(1.0) as u64;
     w::hint_small(
         ui,
-        &format!(
-            "Показывается последний запуск Actions в каждом репозитории. Без токена GitHub даёт 60 запросов в час, поэтому опрос раз в {mins} мин; с токеном — раз в минуту."
-        ),
+        &tr!("modes.github.hint", mins = mins),
         11.0,
     );
 }
 
 fn visualizer_settings(ui: &mut Ui, cx: &mut Cx, v: &VisualizerView) {
-    if let Some(i) = w::tabs(ui, &[("С пиками", None), ("Зеркальные", None)], v.style.clamp(0, 1) as usize) {
+    if let Some(i) = w::tabs(ui, &[(tr!("modes.visualizer.style_peaks"), None), (tr!("modes.visualizer.style_mirrored"), None)], v.style.clamp(0, 1) as usize) {
         send_mode(cx, "visualizer", ModeCommand::VisualizerStyle(i as i64));
     }
     if let Some(e) = &v.error {
@@ -579,7 +575,7 @@ fn visualizer_settings(ui: &mut Ui, cx: &mut Cx, v: &VisualizerView) {
     }
     w::hint_small(
         ui,
-        "Спектр того, что звучит на компьютере (монитор устройства вывода PipeWire). Это поток кадров: пока режим на колонке, она получает 5–8 кадров в секунду.",
+        tr!("modes.visualizer.hint"),
         11.0,
     );
 }
@@ -587,29 +583,29 @@ fn visualizer_settings(ui: &mut Ui, cx: &mut Cx, v: &VisualizerView) {
 fn notify_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     let p = pal();
     let n = &cx.snap.notify;
-    if w::switch(ui, n.enabled, "Показывать уведомления KDE на колонке", true).clicked() {
+    if w::switch(ui, n.enabled, tr!("modes.notify.enable"), true).clicked() {
         cx.send(Command::SetNotifyEnabled(!n.enabled));
     }
     if let Some(e) = &n.error {
         w::para(ui, e, w::font(13.0), p.danger);
     }
-    let lw = w::text_width(ui, "Показывать, секунд", w::font(13.0)) + 12.0;
+    let lw = w::text_width(ui, tr!("modes.notify.duration"), w::font(13.0)).max(w::text_width(ui, tr!("modes.notify.ignore"), w::font(13.0))) + 12.0;
     let en = n.enabled;
     ui.spacing_mut().item_spacing.y = 8.0;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        label_col(ui, "Показывать, секунд", lw);
+        label_col(ui, tr!("modes.notify.duration"), lw);
         if let Some(v) = Spin::new("notify-duration", n.duration as i64, 2, 60).enabled(en).show(ui) {
             cx.send(Command::SetNotifyDuration(v as u32));
         }
     });
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        label_col(ui, "Не показывать от", lw);
+        label_col(ui, tr!("modes.notify.ignore"), lw);
         let joined = n.ignore.join(", ");
         let buf = st.ignore_input.get_or_insert_with(|| joined.clone());
         let width = (ui.available_width()).max(220.0);
-        let r = w::text_field(ui, buf, Field { hint: "приложения через запятую", width, enabled: en, ..Default::default() });
+        let r = w::text_field(ui, buf, Field { hint: tr!("modes.notify.ignore_hint"), width, enabled: en, ..Default::default() });
         if r.lost_focus() {
             let list: Vec<String> = buf.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
             if list != n.ignore {
@@ -620,15 +616,15 @@ fn notify_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
             *buf = joined;
         }
     });
-    if Key::new("Показать тестовое").icon("bell").show(ui).clicked() {
+    if Key::new(tr!("modes.notify.test")).icon("bell").show(ui).clicked() {
         cx.send(Command::TestNotification);
     }
-    w::hint_small(ui, "Карточка поверх любого режима, изображения или трансляции; затем на колонке снова то, что было.", 11.0);
+    w::hint_small(ui, tr!("modes.notify.hint"), 11.0);
 }
 
 fn settings_group(ui: &mut Ui, cx: &mut Cx, st: &mut State, selected: &str) {
     if selected == NOTIFY {
-        w::group(ui, "Уведомления рабочего стола", |ui| {
+        w::group(ui, tr!("modes.notify.group"), |ui| {
             ui.spacing_mut().item_spacing.y = 10.0;
             notify_settings(ui, cx, st);
         });
@@ -637,7 +633,7 @@ fn settings_group(ui: &mut Ui, cx: &mut Cx, st: &mut State, selected: &str) {
     let Some(m) = cx.snap.modes.iter().find(|m| m.id == selected) else { return };
     let view = m.view.clone();
     let status = m.status.clone();
-    w::group(ui, "Настройки", |ui| {
+    w::group(ui, tr!("modes.settings.group"), |ui| {
         ui.spacing_mut().item_spacing.y = 10.0;
         match (&view, selected) {
             (ModeView::Clock(v), _) => clock_settings(ui, cx, st, v),
@@ -646,13 +642,11 @@ fn settings_group(ui: &mut Ui, cx: &mut Cx, st: &mut State, selected: &str) {
             (ModeView::Github(v), _) => github_settings(ui, cx, st, v),
             (ModeView::Visualizer(v), _) => visualizer_settings(ui, cx, v),
             (_, "sysmon") => {
-                w::hint(ui, "Загрузка процессора и видеокарты, температуры, память. Данные: /proc, датчики hwmon, nvidia-smi или sysfs AMD. Кадр раз в 2 секунды.");
+                w::hint(ui, tr!("modes.sysmon.hint"));
             }
             (_, "claudestats") => {
-                let t = format!(
-                    "{}Считается по журналам Claude Code в ~/.claude/projects за сегодня: запросы, ответы и токены.",
-                    if status.is_empty() { String::new() } else { format!("{status}\n\n") }
-                );
+                let hint = tr!("modes.claudestats.hint");
+                let t = if status.is_empty() { hint.to_string() } else { format!("{status}\n\n{hint}") };
                 w::hint(ui, &t);
             }
             _ => {}
@@ -669,9 +663,9 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         .or_else(|| snap.live_on_device.map(str::to_string))
         .unwrap_or_else(|| "clock".to_string());
     let header_h = area(ui, full, |ui| {
-        w::page_header(ui, "Режимы", "экраны, которые рисуются сами и обновляются на колонке", |ui| {
+        w::page_header(ui, tr!("modes.page.title"), tr!("modes.page.subtitle"), |ui| {
             if snap.mode == DisplayMode::Live {
-                let k = Key::new("Остановить").icon("stop").tip("Перестать обновлять колонку (картинка останется)");
+                let k = Key::new(tr!("modes.page.stop")).icon("stop").tip(tr!("modes.page.stop_tip"));
                 if k.show(ui).clicked() {
                     cx.send(Command::StopLive);
                 }

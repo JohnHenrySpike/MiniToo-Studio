@@ -46,6 +46,12 @@ GitHub Actions, визуализатор звука), уведомления р�
 (`~/.local/share/minitoo-studio/MiniToo Studio/gallery/`) — те же, что у Qt-версии: конфигурация
 и галерея подхватываются без переноса.
 
+## Языки
+
+Интерфейс на русском и английском; язык, формат времени (24/12 ч) и даты выбираются в
+«Настройки → Язык и форматы». Тексты лежат в `locales/*.lang` — свой перевод делается копией
+`en.lang` в `~/.config/minitoo-studio/locales/<код>.lang`, подробности в `locales/README.md`.
+
 ## Устройство
 
 ```
@@ -59,6 +65,7 @@ src/
   faces.rs, gif.rs сцены Claude (19 штук, попиксельно как в эталоне) и запись GIF
   media.rs, gallery.rs   загрузка картинок (png/jpg/gif/webp/apng/bmp/tiff/svg/jxl; avif/heic — через ImageMagick, если он есть), рендер 160×128, галерея
   canvas.rs, fonts.rs, pixelfont.rs, icons.rs   рисование кадров: DejaVu, ручной шрифт 5×7, иконки 12×12
+  i18n.rs          языки (каталоги locales/*.lang, tr!/trn!), форматы даты и времени
   claude.rs        сессии Claude Code, подписи тревоги, установка хуков
   http.rs          локальный HTTP/1.1
   platform/        захват экрана (портал + PipeWire), уведомления, блокировка, BlueZ, трей, тема иконок

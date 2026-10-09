@@ -248,7 +248,7 @@ impl NowPlaying {
         if let Some(e) = &self.error {
             return e.clone();
         }
-        if self.p.service.is_empty() { "ни один плеер не запущен".into() } else { format!("{}: {}", self.p.identity, self.track()) }
+        if self.p.service.is_empty() { tr!("nowplaying.no_player").into() } else { format!("{}: {}", self.p.identity, self.track()) }
     }
 
     fn poll(&mut self, cx: &mut ModeCx) {
@@ -343,7 +343,7 @@ impl NowPlaying {
             let grey = Color::rgb(60, 60, 80);
             c.fill_ellipse(70.0 - 9.0, 58.0 - 7.0, 18.0, 14.0, grey);
             c.fill_rect(77.0, 30.0, 3.0, 28.0, grey);
-            c.text(r(0.0, 76.0, 160.0, 20.0), Align::CENTER, "Ничего не играет", FontSpec::bold(12.0), Color::rgb(170, 170, 190));
+            c.text(r(0.0, 76.0, 160.0, 20.0), Align::CENTER, tr!("nowplaying.nothing_playing"), FontSpec::bold(12.0), Color::rgb(170, 170, 190));
             return c.to_frame();
         }
 
@@ -436,10 +436,10 @@ impl LiveMode for NowPlaying {
         "nowplaying"
     }
     fn title(&self) -> &'static str {
-        "Сейчас играет"
+        tr!("nowplaying.title")
     }
     fn subtitle(&self) -> &'static str {
-        "обложка и трек из любого плеера (MPRIS)"
+        tr!("nowplaying.subtitle")
     }
     fn icon(&self) -> &'static str {
         "music"
@@ -464,7 +464,7 @@ impl LiveMode for NowPlaying {
         }
         #[cfg(not(target_os = "linux"))]
         {
-            self.error = Some("MPRIS недоступен на этой платформе".into());
+            self.error = Some(tr!("nowplaying.err.unsupported").into());
             cx.set_status(self.status_text());
         }
     }
@@ -684,7 +684,7 @@ pub mod mpris {
     }
 
     pub async fn session() -> Result<zbus::Connection, String> {
-        zbus::Connection::session().await.map_err(|e| format!("нет сессионной шины D-Bus: {e}"))
+        zbus::Connection::session().await.map_err(|e| tr!("nowplaying.err.no_session_bus", error = e))
     }
 
     /// Every MPRIS player on the bus with its state (`None`: it did not answer), in bus order.
@@ -692,7 +692,7 @@ pub mod mpris {
         let call = conn.call_method(Some("org.freedesktop.DBus"), "/org/freedesktop/DBus", Some("org.freedesktop.DBus"), "ListNames", &());
         let reply = tokio::time::timeout(Duration::from_secs(2), call)
             .await
-            .map_err(|_| "D-Bus не отвечает".to_string())?
+            .map_err(|_| tr!("nowplaying.err.dbus_timeout").to_string())?
             .map_err(|e| format!("D-Bus: {e}"))?;
         let names: Vec<String> = reply.body().deserialize().map_err(|e| format!("D-Bus: {e}"))?;
         let names: Vec<String> = names.into_iter().filter(|n| n.starts_with(PREFIX)).collect();
