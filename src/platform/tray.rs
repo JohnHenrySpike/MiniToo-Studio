@@ -142,6 +142,7 @@ mod imp {
                 CheckmarkItem {
                     label: MENU_CLAUDE.into(),
                     checked: self.state.claude_mode,
+                    icon_data: include_bytes!("../../assets/claude.png").to_vec(),
                     activate: Box::new(|t: &mut Self| (t.on)(TrayAction::ToggleClaude)),
                     ..Default::default()
                 }
