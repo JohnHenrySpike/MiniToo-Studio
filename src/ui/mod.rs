@@ -9,6 +9,7 @@ pub mod pixel;
 mod script;
 pub mod textures;
 pub mod theme;
+mod titlebar;
 pub mod widgets;
 
 use crate::api::{Command, CoreHandle, Snapshot, Theme};
@@ -32,8 +33,9 @@ pub enum UiExit {
 }
 
 pub const PAGE_COUNT: usize = 6;
-pub const WINDOW_SIZE: Vec2 = vec2(1340.0, 860.0);
-pub const MIN_SIZE: Vec2 = vec2(1080.0, 700.0);
+/// Sizes include the drawn title bar, so the columns below it keep 860 / 700 px.
+pub const WINDOW_SIZE: Vec2 = vec2(1340.0, 860.0 + titlebar::HEIGHT);
+pub const MIN_SIZE: Vec2 = vec2(1080.0, 700.0 + titlebar::HEIGHT);
 const NAV_WIDE: f32 = 224.0;
 const NAV_NARROW: f32 = 80.0;
 const PANEL_WIDTH: f32 = 348.0;
@@ -106,6 +108,7 @@ pub fn run(core: CoreHandle, opts: &UiOptions) -> UiExit {
     let viewport = egui::ViewportBuilder::default()
         .with_title("MiniToo Studio")
         .with_app_id("minitoo-studio")
+        .with_decorations(false)
         .with_icon({
             let img = crate::platform::tray::icon_rgba(crate::color::Color::hex(0xd97757), 64);
             egui::IconData { width: img.width(), height: img.height(), rgba: img.into_raw() }
@@ -365,6 +368,13 @@ impl eframe::App for StudioApp {
         let narrow = width < 1220.0;
         let nav_w = if narrow { NAV_NARROW } else { NAV_WIDE };
 
+        egui::Panel::top("titlebar")
+            .exact_size(titlebar::HEIGHT)
+            .resizable(false)
+            .show_separator_line(false)
+            .frame(egui::Frame::NONE.fill(p.shell))
+            .show(ui, |ui| titlebar::show(ui, "MiniToo Studio"));
+
         egui::Panel::left("nav")
             .exact_size(nav_w)
             .resizable(false)
@@ -403,6 +413,7 @@ impl eframe::App for StudioApp {
         if let Some(t) = theme_request {
             self.set_theme(t);
         }
+        titlebar::edges(ui);
 
         self.update_previews(!self.closing);
         self.tex.end_pass();
