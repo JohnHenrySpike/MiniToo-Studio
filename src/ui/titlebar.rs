@@ -12,6 +12,29 @@ const KEY_GAP: f32 = 6.0;
 const EDGE: f32 = 5.0;
 const CORNER: f32 = 12.0;
 
+/// Hands the pointer to the compositor (window move or resize). The compositor keeps the
+/// button release to itself, so egui would think the button is still down and the drag still
+/// on, and ignore the mouse wheel until the next click; `take_pending_release` makes up for it.
+fn compositor_grab(ui: &Ui, cmd: ViewportCommand) {
+    let ctx = ui.ctx();
+    ctx.send_viewport_cmd(cmd);
+    ctx.data_mut(|d| d.insert_temp(Id::new(RELEASE_KEY), true));
+    ctx.request_repaint();
+}
+
+const RELEASE_KEY: &str = "titlebar-pending-release";
+
+/// For `raw_input_hook`: the button release the compositor kept after a move or resize, to be
+/// put in front of the next frame's events (once).
+pub fn take_pending_release(ctx: &egui::Context) -> Option<egui::Event> {
+    let id = Id::new(RELEASE_KEY);
+    if !ctx.data_mut(|d| d.remove_temp::<bool>(id)).unwrap_or(false) {
+        return None;
+    }
+    let (pos, modifiers) = ctx.input(|i| (i.pointer.latest_pos(), i.modifiers));
+    Some(egui::Event::PointerButton { pos: pos.unwrap_or_default(), button: egui::PointerButton::Primary, pressed: false, modifiers })
+}
+
 #[derive(Clone, Copy)]
 enum Action {
     Minimize,
@@ -36,7 +59,7 @@ pub fn show(ui: &mut Ui, title: &str) {
     if strip.double_clicked() {
         ui.ctx().send_viewport_cmd(ViewportCommand::Maximized(!max));
     } else if strip.drag_started_by(egui::PointerButton::Primary) {
-        ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+        compositor_grab(ui, ViewportCommand::StartDrag);
     }
 
     let st = PixStyle::new(9);
@@ -114,7 +137,7 @@ pub fn edges(ui: &mut Ui) {
     for (i, (zone, dir, cursor)) in zones.into_iter().enumerate() {
         let resp = ui.interact(zone, Id::new(("window-edge", i)), Sense::drag()).on_hover_cursor(cursor);
         if pressed && resp.hovered() {
-            ui.ctx().send_viewport_cmd(ViewportCommand::BeginResize(dir));
+            compositor_grab(ui, ViewportCommand::BeginResize(dir));
         }
     }
 }

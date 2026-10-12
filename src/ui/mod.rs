@@ -314,6 +314,9 @@ impl eframe::App for StudioApp {
     }
 
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        if let Some(release) = titlebar::take_pending_release(ctx) {
+            raw.events.insert(0, release);
+        }
         let Some(sc) = self.script.as_mut() else { return };
         match sc.hook(raw) {
             script::Action::None => {}
