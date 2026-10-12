@@ -252,7 +252,10 @@ pub fn paint_screen_frame(painter: &Painter, min: Pos2, factor: f32, live: bool,
     painter.rect_filled(rect, cr(radius), if beige { p.body_lo } else { p.bezel });
     painter.rect_stroke(rect, cr(radius), Stroke::new(1.0, if beige { p.body_edge } else { p.bezel_lo }), StrokeKind::Inside);
     painter.rect_filled(rect.shrink(bezel - 2.0), 3, Color32::from_black_alpha(64));
-    let glass = Rect::from_min_size(rect.min + Vec2::splat(bezel), vec2((160.0 * factor).round(), (128.0 * factor).round()));
+    // on whole physical pixels: frames are fitted to them (see `textures`)
+    let ppp = painter.pixels_per_point();
+    let phys = |pt: f32| (pt * factor * ppp).round() / ppp;
+    let glass = Rect::from_min_size(pixel::snap(painter, rect.min + Vec2::splat(bezel)), vec2(phys(160.0), phys(128.0)));
     painter.rect_filled(glass, 0, p.screen);
     if live {
         painter.rect_stroke(rect.expand(3.0), cr(7.0 + 2.0 * factor), Stroke::new(2.0, p.accent), StrokeKind::Inside);

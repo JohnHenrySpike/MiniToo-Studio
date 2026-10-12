@@ -129,7 +129,7 @@ fn mode_row(ui: &mut Ui, cx: &mut Cx, d: &RowData, current: bool) -> (bool, bool
         let (_, size) = w::screen_size(0.35);
         let glass = w::paint_screen_frame(&painter, thumb.center() - size / 2.0, 0.35, d.live, false);
         if let Some(f) = &m.frame {
-            let tex = cx.tex.frame(ui.ctx(), &format!("mode/{}", m.id), f, true);
+            let tex = cx.tex.frame(ui.ctx(), &format!("mode/{}", m.id), f, glass);
             w::paint_texture(&painter, glass, tex, WHITE);
         }
         if d.live {
@@ -224,7 +224,7 @@ fn mode_card(ui: &mut Ui, cx: &mut Cx, m: &ModeInfo) {
             let (rect, _) = ui.allocate_exact_size(vec2(if two_cols { fs.x } else { width }, fs.y), Sense::hover());
             let glass = w::paint_screen_frame(ui.painter(), pos2(rect.center().x - fs.x / 2.0, rect.top()), factor, on_device, false);
             if let Some(f) = &m.frame {
-                let tex = cx.tex.frame(ui.ctx(), &format!("mode/{}/big", m.id), f, false);
+                let tex = cx.tex.frame(ui.ctx(), &format!("mode/{}/big", m.id), f, glass);
                 w::paint_texture(ui.painter(), glass, tex, WHITE);
             }
         };

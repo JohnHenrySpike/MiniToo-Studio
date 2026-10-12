@@ -1,6 +1,12 @@
 //! Textures for device frames and images: uploaded only when the content changes
 //! (frames are compared by their shared buffer, images by `Arc` identity) and dropped when
 //! not drawn for a while.
+//!
+//! A frame is fitted to the physical pixels of the rect it is drawn in, so device pixels keep
+//! even, sharp edges at any size and display scale: a whole multiple is drawn as is, a
+//! fractional enlargement is pre-scaled by the next whole number and then filtered (each edge
+//! blends over at most one physical pixel), a reduction is resampled on the CPU to exactly the
+//! physical size and drawn 1:1.
 
 use crate::api::Anim;
 use crate::frame::{Frame, HEIGHT, WIDTH};
@@ -12,7 +18,8 @@ use std::time::Duration;
 
 struct FrameTex {
     frame: Frame,
-    smooth: bool,
+    /// physical size the texture was fitted to
+    fit: [usize; 2],
     tex: TextureHandle,
     used: u64,
 }
@@ -39,8 +46,36 @@ pub fn options(smooth: bool) -> TextureOptions {
     }
 }
 
-fn frame_image(frame: &Frame) -> egui::ColorImage {
-    egui::ColorImage::from_rgb([WIDTH, HEIGHT], frame.rgb())
+/// Physical pixel size of `rect` on the screen.
+pub fn physical_size(ctx: &egui::Context, rect: egui::Rect) -> [usize; 2] {
+    let ppp = ctx.pixels_per_point();
+    [((rect.width() * ppp).round() as usize).max(1), ((rect.height() * ppp).round() as usize).max(1)]
+}
+
+/// The frame as an image for a rect of `fit` physical pixels, with its filter.
+fn fitted_image(frame: &Frame, [w, h]: [usize; 2]) -> (egui::ColorImage, TextureOptions) {
+    let raw = || egui::ColorImage::from_rgb([WIDTH, HEIGHT], frame.rgb());
+    if w % WIDTH == 0 && h % HEIGHT == 0 && w / WIDTH == h / HEIGHT {
+        return (raw(), TextureOptions::NEAREST);
+    }
+    if w >= WIDTH && h >= HEIGHT {
+        // sharp bilinear: whole-number pre-scale, then the GPU filters the small remainder
+        let k = w.div_ceil(WIDTH).max(h.div_ceil(HEIGHT));
+        let (kw, kh) = (WIDTH * k, HEIGHT * k);
+        let src = frame.rgb();
+        let mut px = Vec::with_capacity(kw * kh);
+        for y in 0..kh {
+            let row = &src[(y / k) * WIDTH * 3..][..WIDTH * 3];
+            for x in 0..kw {
+                let c = &row[(x / k) * 3..][..3];
+                px.push(egui::Color32::from_rgb(c[0], c[1], c[2]));
+            }
+        }
+        return (egui::ColorImage::new([kw, kh], px), TextureOptions::LINEAR);
+    }
+    let src = image::RgbImage::from_raw(WIDTH as u32, HEIGHT as u32, frame.rgb().to_vec()).expect("frame size");
+    let small = image::imageops::resize(&src, w as u32, h as u32, image::imageops::FilterType::Lanczos3);
+    (egui::ColorImage::from_rgb([w, h], small.as_raw()), TextureOptions::NEAREST)
 }
 
 fn rgba_image(img: &RgbaImage) -> egui::ColorImage {
@@ -48,21 +83,33 @@ fn rgba_image(img: &RgbaImage) -> egui::ColorImage {
 }
 
 impl Textures {
-    /// Texture for a 160×128 frame under `key`; re-uploaded only when the frame changed.
-    pub fn frame(&mut self, ctx: &egui::Context, key: &str, frame: &Frame, smooth: bool) -> TextureId {
+    /// Texture for a 160×128 frame under `key`, fitted to be drawn in `rect`; re-uploaded only
+    /// when the frame or the physical size changed.
+    pub fn frame(&mut self, ctx: &egui::Context, key: &str, frame: &Frame, rect: egui::Rect) -> TextureId {
+        self.frame_fit(ctx, key, frame, physical_size(ctx, rect))
+    }
+
+    /// The frame as is, 160×128 without filtering (for shaders that sample it themselves).
+    pub fn frame_raw(&mut self, ctx: &egui::Context, key: &str, frame: &Frame) -> TextureId {
+        self.frame_fit(ctx, key, frame, [WIDTH, HEIGHT])
+    }
+
+    fn frame_fit(&mut self, ctx: &egui::Context, key: &str, frame: &Frame, fit: [usize; 2]) -> TextureId {
         let pass = self.pass;
         if let Some(e) = self.frames.get_mut(key) {
-            if e.frame != *frame || e.smooth != smooth {
-                e.tex.set(frame_image(frame), options(smooth));
+            if e.frame != *frame || e.fit != fit {
+                let (img, opt) = fitted_image(frame, fit);
+                e.tex.set(img, opt);
                 e.frame = frame.clone();
-                e.smooth = smooth;
+                e.fit = fit;
             }
             e.used = pass;
             return e.tex.id();
         }
-        let tex = ctx.load_texture(key, frame_image(frame), options(smooth));
+        let (img, opt) = fitted_image(frame, fit);
+        let tex = ctx.load_texture(key, img, opt);
         let id = tex.id();
-        self.frames.insert(key.to_string(), FrameTex { frame: frame.clone(), smooth, tex, used: pass });
+        self.frames.insert(key.to_string(), FrameTex { frame: frame.clone(), fit, tex, used: pass });
         id
     }
 

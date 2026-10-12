@@ -65,7 +65,7 @@ fn scene_thumb(st: &mut State, state: ClaudeState, id: &str) -> Arc<SceneThumb> 
 
 fn paint_anim(ui: &mut Ui, cx: &mut Cx, glass: Rect, set: &SceneSet, key: &str) {
     if let Some((i, f)) = textures::anim_frame(ui.ctx(), &set.anim) {
-        let tex = cx.tex.frame(ui.ctx(), &format!("{key}/{i}"), f, false);
+        let tex = cx.tex.frame(ui.ctx(), &format!("{key}/{i}"), f, glass);
         w::paint_texture(ui.painter(), glass, tex, WHITE);
     }
 }
@@ -175,7 +175,7 @@ fn face_card(ui: &mut Ui, cx: &mut Cx, st: &mut State, set: &SceneSet, width: f3
             let glass = w::paint_screen_frame(ui.painter(), frame_rect.min, 0.375, current, false);
             let idx = if hovered && thumb.frames.len() > 1 { textures::anim_index(ui.ctx(), thumb.frames.len(), thumb.speed) } else { thumb.key };
             if let Some(f) = thumb.frames.get(idx) {
-                let tex = cx.tex.frame(ui.ctx(), &format!("scene/{}/{id}/{idx}", s.id()), f, true);
+                let tex = cx.tex.frame(ui.ctx(), &format!("scene/{}/{id}/{idx}", s.id()), f, glass);
                 let op = dim * if enabled { 1.0 } else { 0.35 };
                 w::paint_texture(ui.painter(), glass, tex, Color32::WHITE.gamma_multiply(op));
             }

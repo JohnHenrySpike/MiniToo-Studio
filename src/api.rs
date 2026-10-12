@@ -322,6 +322,8 @@ pub struct SettingsView {
 pub struct Snapshot {
     pub debug: bool,
     pub theme: Theme,
+    /// `ui/crt`: the screen of the drawn MiniToo looks like a CRT
+    pub crt: bool,
     pub page: usize,
     pub mode: DisplayMode,
     /// the live mode on the device (incl. the lock-screen clock)
@@ -365,6 +367,7 @@ pub enum Command {
     // ---- window / app
     SetPage(usize),
     SetTheme(Theme),
+    SetCrt(bool),
     ShowWindow,
     Quit,
     /// the Modes page is visible: keep every mode running for the live thumbnails

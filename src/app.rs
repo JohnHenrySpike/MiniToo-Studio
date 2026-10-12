@@ -237,6 +237,7 @@ pub struct Controller {
     quit: bool,
     page: usize,
     theme: Theme,
+    crt: bool,
 }
 
 fn avg_delay(delays: &[u32]) -> u32 {
@@ -434,6 +435,7 @@ impl Controller {
             quit: false,
             page: settings.int_in("ui/page", 0, 0, 5) as usize,
             theme: if settings.string("ui/theme", "beige") == "dark" { Theme::Dark } else { Theme::Beige },
+            crt: settings.bool("ui/crt", true),
             settings,
             opts,
         };
@@ -1918,6 +1920,10 @@ impl Controller {
                 self.theme = t;
                 self.settings.set_string("ui/theme", if t == Theme::Dark { "dark" } else { "beige" });
             }
+            Command::SetCrt(on) => {
+                self.crt = on;
+                self.settings.set_bool("ui/crt", on);
+            }
             Command::ShowWindow => self.show_serial += 1,
             Command::Quit => self.quit = true,
             Command::PreviewModes(on) => self.set_previewing(on),
@@ -2646,6 +2652,7 @@ impl Controller {
         let snap = Snapshot {
             debug: self.opts.debug,
             theme: self.theme,
+            crt: self.crt,
             page: self.page,
             mode: self.mode,
             live_on_device: on_device,

@@ -2,6 +2,7 @@
 //! from the core and sends commands; everything else here is purely local UI state.
 
 pub mod crop_box;
+mod crt;
 mod device_panel;
 mod nav;
 mod pages;

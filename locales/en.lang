@@ -32,6 +32,7 @@ settings.group.look = Appearance
 settings.theme.beige = Beige
 settings.theme.night = Night
 settings.theme.hint = MiniToo body colours or a dark desk for the evening. The speaker on the right always stays beige.
+settings.crt = CRT look on the speaker's screen: scanlines, glow and curved glass
 settings.group.language = Language and formats
 settings.language = Language
 settings.language.system = System ({language})

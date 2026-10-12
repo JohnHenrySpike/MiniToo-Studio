@@ -209,6 +209,9 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
                 let rest = ui.available_width();
                 w::para_w(ui, tr!("settings.theme.hint"), w::font(13.0), p.text_dim, rest, egui::Align::Min);
             });
+            if w::switch(ui, cx.snap.crt, tr!("settings.crt"), true).clicked() {
+                cx.send(Command::SetCrt(!cx.snap.crt));
+            }
         });
 
         let labels = [tr!("settings.language"), tr!("settings.time"), tr!("settings.date"), tr!("settings.mac"), tr!("settings.channel"), tr!("settings.keepalive")];

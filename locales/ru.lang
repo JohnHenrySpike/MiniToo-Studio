@@ -27,6 +27,7 @@ settings.group.look = Оформление
 settings.theme.beige = Бежевая
 settings.theme.night = Ночная
 settings.theme.hint = Цвета корпуса MiniToo или тёмный стол для вечера. Сама колонка справа всегда бежевая.
+settings.crt = Экран колонки как у ЭЛТ: строки развёртки, свечение и выпуклое стекло
 settings.group.language = Язык и форматы
 settings.language = Язык
 settings.language.system = Системный ({language})

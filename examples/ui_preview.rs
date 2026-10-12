@@ -291,6 +291,7 @@ fn build() -> Snapshot {
     Snapshot {
         debug: false,
         theme: Theme::Beige,
+        crt: std::env::var_os("MINITOO_NO_CRT").is_none(),
         page: 0,
         mode: DisplayMode::Live,
         live_on_device: Some("clock"),
@@ -371,6 +372,8 @@ fn build() -> Snapshot {
             hooks_path: "~/.claude/settings.json".into(),
             hooks_message: None,
             snippet: minitoo::claude::hooks_snippet(47800),
+            sounds: true,
+            sound_variants: Vec::new(),
         },
         log: Arc::new(vec![
             loc("20:47:58  подключено", "20:47:58  connected").into(),
@@ -443,6 +446,7 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
     match cmd {
         Command::SetPage(p) => s.page = p,
         Command::SetTheme(t) => s.theme = t,
+        Command::SetCrt(on) => s.crt = on,
         Command::Quit => s.quit = true,
         Command::Connect(on) => {
             if on {

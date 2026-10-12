@@ -1,6 +1,7 @@
 //! Right panel (§16.6): the drawn MiniToo whose screen mirrors the device and whose keys and
 //! knob work, the connection line, what is on the screen, brightness, volume and the log.
 
+use super::crt;
 use super::pixel::{self, PixStyle};
 use super::textures;
 use super::theme::{WHITE, hex, pal};
@@ -97,8 +98,13 @@ fn mock(ui: &mut Ui, cx: &mut Cx, origin: egui::Pos2) {
         if d.screen_on
             && let Some((i, f)) = textures::anim_frame(ui.ctx(), mirror)
         {
-            let tex = cx.tex.frame(ui.ctx(), &format!("mirror/{i}"), f, false);
-            w::paint_texture(&painter, glass, tex, WHITE);
+            if cx.snap.crt && crt::available() {
+                let tex = cx.tex.frame_raw(ui.ctx(), &format!("mirror-raw/{i}"), f);
+                crt::paint(&painter, glass, tex);
+            } else {
+                let tex = cx.tex.frame(ui.ctx(), &format!("mirror/{i}"), f, glass);
+                w::paint_texture(&painter, glass, tex, WHITE);
+            }
         }
     } else {
         let big = PixStyle::new(11).zoom(2);

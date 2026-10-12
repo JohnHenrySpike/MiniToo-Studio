@@ -334,7 +334,7 @@ fn thumb_cell(ui: &mut Ui, cx: &mut Cx, st: &mut State, t: &Thumb, cell: Rect, f
     let painter = ui.painter().clone();
     let glass = w::paint_screen_frame(&painter, frame_min, factor, current, false);
     if let Some(f) = t.thumb() {
-        let tex = cx.tex.frame(ui.ctx(), &t.key(), f, true);
+        let tex = cx.tex.frame(ui.ctx(), &t.key(), f, glass);
         w::paint_texture(&painter, glass, tex, WHITE);
     }
     let shade = ui.ctx().animate_bool_with_time(id.with("shade"), hovered, 0.12);
@@ -439,7 +439,7 @@ fn bottom(ui: &mut Ui, cx: &mut Cx, rect: Rect) {
     let (_, fs) = w::screen_size(factor);
     let glass = w::paint_screen_frame(ui.painter(), pos2(inner.left(), inner.center().y - fs.y / 2.0), factor, false, false);
     if has && let Some((i, f)) = textures::anim_frame(ui.ctx(), &img.preview) {
-        let tex = cx.tex.frame(ui.ctx(), &format!("preview/{i}"), f, false);
+        let tex = cx.tex.frame(ui.ctx(), &format!("preview/{i}"), f, glass);
         w::paint_texture(ui.painter(), glass, tex, WHITE);
     }
     let col = Rect::from_min_max(pos2(inner.left() + fs.x + 20.0, inner.top()), inner.max);
