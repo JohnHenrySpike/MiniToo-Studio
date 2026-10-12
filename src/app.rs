@@ -821,6 +821,9 @@ impl Controller {
                 };
                 if s == LinkState::Connected {
                     self.query_device_info();
+                    // the speaker keeps whatever brightness it had (say, the lock-screen 15% of an
+                    // app that quit while locked): set ours
+                    self.send_brightness(if self.away { self.away_brightness } else { self.brightness });
                 }
             }
             WorkerEvent::Log(l) => self.add_log(l),

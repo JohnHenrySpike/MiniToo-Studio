@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-/// Calls `on(active)` for every ActiveChanged signal (sent to anyone or to us directly).
+/// Calls `on(active)` for every ActiveChanged signal (sent to anyone or to us directly), and
+/// once with `true` at the start if the screen is already locked (`GetActive`): an app started
+/// behind the lock screen would otherwise miss the lock and then ignore the unlock.
 /// Never calls `Lock`.
 pub fn spawn_watch(rt: &tokio::runtime::Handle, on: Arc<dyn Fn(bool) + Send + Sync>) {
     #[cfg(target_os = "linux")]
@@ -58,6 +60,16 @@ mod linux {
             .build();
         let mut stream = MessageStream::for_match_rule(rule, &conn, Some(16)).await?;
         let mut dedup = Dedup::default();
+        // asked after subscribing, so a change in between is not lost
+        let active = conn
+            .call_method(Some("org.freedesktop.ScreenSaver"), PATHS[0], Some("org.freedesktop.ScreenSaver"), "GetActive", &())
+            .await
+            .ok()
+            .and_then(|r| r.body().deserialize::<bool>().ok());
+        if active == Some(true) {
+            dedup.accept(true, PATHS[0], std::time::Instant::now());
+            on(true);
+        }
         while let Some(msg) = stream.next().await {
             let msg = msg?;
             let header = msg.header();
