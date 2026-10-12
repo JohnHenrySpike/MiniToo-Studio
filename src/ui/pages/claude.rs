@@ -4,6 +4,7 @@ use super::{pick_files, scroll_page};
 use crate::api::{Command, DisplayMode, SceneSet};
 use crate::claude::{ClaudeState, Session};
 use crate::faces;
+use crate::sound;
 use crate::frame::Frame;
 use crate::ui::Cx;
 use crate::ui::pixel::PixStyle;
@@ -245,6 +246,59 @@ fn faces_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     });
 }
 
+/// One state's column: title, then a row per sound (choose = click, ▶ = listen) and «no sound».
+fn sound_column(ui: &mut Ui, cx: &mut Cx, state: ClaudeState, width: f32) {
+    let p = pal();
+    let c = &cx.snap.claude;
+    let chosen = c.sound_variants.iter().find(|(s, _)| *s == state).map(|(_, v)| v.as_str()).unwrap_or("");
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        ui.spacing_mut().item_spacing.y = 6.0;
+        let st12 = PixStyle::new(12);
+        let tw = st12.measure(state.title()).x;
+        let (r, _) = ui.allocate_exact_size(vec2(width, st12.height(state.title())), Sense::hover());
+        crate::ui::pixel::paint_text(ui.painter(), pos2(r.center().x - tw / 2.0, r.top()), state.title(), &st12, state_color(&p, state));
+        let name_w = width - Key::icon_only("play").size(ui).x - 6.0;
+        for &v in sound::variants(state).iter().chain([sound::OFF].iter()) {
+            w::row(ui, 33.0, 6.0, |ui| {
+                let pick = Key::new(sound::title(v)).checked(chosen == v).width(name_w).enabled(c.sounds).tip(tr!("claude_page.sounds.pick_tip"));
+                if pick.show(ui).clicked() {
+                    cx.send(Command::PickSound(state, v.to_string()));
+                }
+                if v != sound::OFF && Key::icon_only("play").tip(tr!("claude_page.sounds.play_tip")).show(ui).clicked() {
+                    cx.send(Command::PreviewSound(state, v.to_string()));
+                }
+            });
+        }
+    });
+}
+
+fn sounds_group(ui: &mut Ui, cx: &mut Cx) {
+    let p = pal();
+    let on = cx.snap.claude.sounds;
+    w::group(ui, tr!("claude_page.sounds.group"), |ui| {
+        ui.spacing_mut().item_spacing.y = 14.0;
+        if w::switch(ui, on, tr!("claude_page.status.sounds"), true).clicked() {
+            cx.send(Command::SetSounds(!on));
+        }
+        let width = ui.available_width();
+        if width >= 690.0 {
+            let cw = (width - 24.0) / 3.0;
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 12.0;
+                for s in ClaudeState::ALL {
+                    sound_column(ui, cx, s, cw);
+                }
+            });
+        } else {
+            for s in ClaudeState::ALL {
+                sound_column(ui, cx, s, width);
+            }
+        }
+        w::para(ui, tr!("claude_page.status.sounds_tip"), w::font(12.0), p.text_dim);
+    });
+}
+
 fn sessions_group(ui: &mut Ui, cx: &mut Cx) {
     let p = pal();
     let c = &cx.snap.claude;
@@ -384,6 +438,7 @@ pub fn show(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
         });
         status_card(ui, cx);
         faces_group(ui, cx, st);
+        sounds_group(ui, cx);
         sessions_group(ui, cx);
         hooks_group(ui, cx, st);
     });

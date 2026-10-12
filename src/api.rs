@@ -261,6 +261,9 @@ pub struct ClaudeView {
     pub interrupt: bool,
     pub idle_alerts: bool,
     pub alert_caption: bool,
+    pub sounds: bool,
+    /// chosen sound per state (`sound::variants` id or `sound::OFF`)
+    pub sound_variants: Vec<(ClaudeState, String)>,
     pub scene_minutes: u32,
     pub scenes: Vec<SceneSet>,
     pub port: u16,
@@ -458,6 +461,11 @@ pub enum Command {
     SetInterrupt(bool),
     SetIdleAlerts(bool),
     SetAlertCaption(bool),
+    SetSounds(bool),
+    /// choose this state's sound (and play it)
+    PickSound(ClaudeState, String),
+    /// play a sound without choosing it
+    PreviewSound(ClaudeState, String),
     /// 10 s fake session + overlay on the device
     TestState(ClaudeState),
     /// overlay 10 s with the current scene of this state

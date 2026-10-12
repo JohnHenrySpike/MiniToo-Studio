@@ -12,6 +12,7 @@ pub mod icons;
 pub mod pixelfont;
 pub mod protocol;
 pub mod claude;
+pub mod sound;
 pub mod live;
 pub mod settings;
 pub mod api;

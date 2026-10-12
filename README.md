@@ -44,7 +44,8 @@ RFCOMM — no phone and no Divoom app — and turns that little screen into a de
   **rotation**.
 - 🤖 **Claude Code status.** One click installs hooks into `~/.claude/settings.json`; from then on
   the speaker shows whether Claude is working, resting or **waiting for you** — with the project
-  name and the question (“Allow Bash?”). 18 hand-drawn pixel animations, or your own GIF.
+  name and the question (“Allow Bash?”). 18 hand-drawn pixel animations, or your own GIF. Each
+  status change comes with a short 8-bit tune from the speaker itself (when it is connected as audio), four to choose from per status.
 - 🔔 **Desktop notifications** as cards with the sender's icon, on top of whatever is showing.
 - 🔒 **Screen lock awareness.** When the computer locks, the speaker shows a clock and dims; after
   unlocking everything comes back as it was.
@@ -155,6 +156,7 @@ The app listens on `127.0.0.1:47800` (local only; the port is configurable).
 | `POST /live/<id>` | — | show a live mode: `clock`, `sysmon`, `nowplaying`, `pomodoro`, `claudestats`, `github`, `visualizer` |
 | `POST /mode/<claude\|idle>` | — | give the screen to Claude, or release it |
 | `POST /state/<working\|alerting\|chilling>` | — | fake a Claude session in that state |
+| `POST /sound/<working\|alerting\|chilling>[/<id>]` | — | play that status sound (or sound `id`) on the speaker |
 | `POST /hook` | Claude Code hook JSON | what the installed hooks call |
 | `GET /status` | — | Claude state and sessions |
 | `GET /device` | — | connection, speaker info, last transfer |

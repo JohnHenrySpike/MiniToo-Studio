@@ -16,6 +16,7 @@ use crate::platform::{bluez, capture, notifications, screensaver, tray};
 use crate::protocol::{self, ColorDepth, Incoming};
 use crate::rotation::{Rotation, RotationEffect};
 use crate::settings::Settings;
+use crate::sound;
 use crate::worker::{DeviceWorker, LinkState, MediaJob, WorkerConfig, WorkerEvent};
 use chrono::Local;
 use rand::seq::SliceRandom;
@@ -69,6 +70,7 @@ pub enum Msg {
     ScreenLock(bool),
     Battery(bluez::BatteryInfo),
     AudioConnect(Result<(), String>),
+    SoundPlayed(Result<(), String>),
     Discovered(Result<Vec<(String, String)>, String>),
     GalleryThumb(String, Option<Frame>),
     FolderThumb(PathBuf, Option<Frame>),
@@ -180,6 +182,14 @@ pub struct Controller {
     claude: ClaudeMonitor,
     claude_interrupt: bool,
     alert_caption: bool,
+    sounds: bool,
+    /// chosen sound per state (`sound::variants` id or `sound::OFF`)
+    sound_variants: HashMap<ClaudeState, String>,
+    sound: sound::Player,
+    /// what the last status sound was for: the aggregate state and, while alerting, which
+    /// sessions ask what (another question sounds again)
+    sound_key: (ClaudeState, Vec<(String, String)>),
+    sound_error: Option<String>,
     scene_minutes: u32,
     faces: Faces,
     shown_face: Option<ClaudeState>,
@@ -376,6 +386,14 @@ impl Controller {
             claude: ClaudeMonitor::new(settings.bool("claude/idleAlerts", false)),
             claude_interrupt: settings.bool("claude/interrupt", true),
             alert_caption: settings.bool("claude/alertCaption", true),
+            sounds: settings.bool("claude/sounds", true),
+            sound_variants: ClaudeState::ALL
+                .iter()
+                .map(|&s| (s, sound::resolve(s, &settings.string(&format!("claude/sound/{}", s.id()), "")).to_string()))
+                .collect(),
+            sound: sound::Player::default(),
+            sound_key: (ClaudeState::Chilling, Vec::new()),
+            sound_error: None,
             scene_minutes: settings.int_in("claude/sceneMinutes", 5, 0, 120) as u32,
             faces: Faces { cache: HashMap::new(), custom: HashMap::new(), current: HashMap::new(), bag: HashMap::new(), revision: 1 },
             shown_face: None,
@@ -613,6 +631,15 @@ impl Controller {
                 }
                 self.start_timer(TimerKind::Battery, 3000);
             }
+            Msg::SoundPlayed(r) => match r {
+                Ok(()) => self.sound_error = None,
+                // the same failure again (speaker not connected as audio) is logged once
+                Err(e) if self.sound_error.as_ref() != Some(&e) => {
+                    self.add_log(tr!("log.sound_error", error = e));
+                    self.sound_error = Some(e);
+                }
+                Err(_) => {}
+            },
             Msg::Discovered(r) => {
                 self.discovering = false;
                 match r {
@@ -1311,8 +1338,42 @@ impl Controller {
         self.variant_state = None;
     }
 
+    /// A short cue on the speaker when the aggregate state changes, and again when another
+    /// question comes in while alerting (§11.7).
+    fn play_state_sound(&mut self, state: ClaudeState) {
+        let asking = if state == ClaudeState::Alerting {
+            self.claude.sessions().into_iter().filter(|s| s.state == state).map(|s| (s.id, s.message)).collect()
+        } else {
+            Vec::new()
+        };
+        let new_question = asking.iter().any(|q| !self.sound_key.1.contains(q));
+        let changed = state != self.sound_key.0 || new_question;
+        self.sound_key = (state, asking);
+        if !changed || !self.sounds {
+            return;
+        }
+        let variant = self.sound_variant(state);
+        self.play_sound(state, &variant);
+    }
+
+    fn sound_variant(&self, state: ClaudeState) -> String {
+        self.sound_variants.get(&state).cloned().unwrap_or_else(|| sound::variants(state)[0].to_string())
+    }
+
+    fn play_sound(&mut self, state: ClaudeState, variant: &str) {
+        let samples = sound::padded(state, variant);
+        if samples.is_empty() {
+            return; // «no sound» for this state
+        }
+        let tx = self.tx.clone();
+        self.sound.play(&self.mac, samples, Box::new(move |r| {
+            let _ = tx.send(Msg::SoundPlayed(r));
+        }));
+    }
+
     fn apply_claude_state(&mut self) {
         let state = self.claude.state();
+        self.play_state_sound(state);
         let claude_mode = self.mode == DisplayMode::Claude;
         if claude_mode && !self.away {
             if !self.overlay_active {
@@ -2221,6 +2282,17 @@ impl Controller {
                 self.settings.set_bool("claude/alertCaption", v);
                 self.start_timer(TimerKind::ClaudeApply, 250);
             }
+            Command::SetSounds(v) => {
+                self.sounds = v;
+                self.settings.set_bool("claude/sounds", v);
+            }
+            Command::PickSound(s, v) => {
+                let v = sound::resolve(s, &v).to_string();
+                self.settings.set_string(&format!("claude/sound/{}", s.id()), &v);
+                self.play_sound(s, &v);
+                self.sound_variants.insert(s, v);
+            }
+            Command::PreviewSound(s, v) => self.play_sound(s, sound::resolve(s, &v)),
             Command::TestState(s) => self.test_state(s),
             Command::ShowStateOnDevice(s) => self.test_face(s),
             Command::PickScene(s, v) => {
@@ -2359,6 +2431,18 @@ impl Controller {
                     self.sessions_changed();
                 }
                 Response::ok()
+            }
+            ("POST", _) if p.starts_with("/sound/") => {
+                // /sound/<state> plays the chosen sound, /sound/<state>/<variant> that variant
+                let mut parts = p[7..].splitn(2, '/');
+                match ClaudeState::parse(parts.next().unwrap_or("")) {
+                    Some(s) => {
+                        let variant = parts.next().map(|v| sound::resolve(s, v).to_string()).unwrap_or_else(|| self.sound_variant(s));
+                        self.play_sound(s, &variant);
+                        Response::ok()
+                    }
+                    None => Response::error(400, "unknown state"),
+                }
             }
             ("POST", _) if p.starts_with("/state/") => match ClaudeState::parse(&p[7..]) {
                 Some(s) => {
@@ -2653,6 +2737,8 @@ impl Controller {
                 interrupt: self.claude_interrupt,
                 idle_alerts: self.claude.idle_alerts,
                 alert_caption: self.alert_caption,
+                sounds: self.sounds,
+                sound_variants: ClaudeState::ALL.iter().map(|&s| (s, self.sound_variant(s))).collect(),
                 scene_minutes: self.scene_minutes,
                 scenes,
                 port: self.port,
