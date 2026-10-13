@@ -39,8 +39,9 @@ RFCOMM — no phone and no Divoom app — and turns that little screen into a de
   area of it at up to 20 fps. The choice is remembered, so the dialog shows up only once.
 - ⏱️ **Live modes** that draw themselves and keep the speaker up to date:
   clock & weather (Open-Meteo, three faces), system monitor (CPU, GPU, RAM, VRAM, temperatures),
-  now playing (cover and track from any MPRIS player), Pomodoro, Claude Code token statistics,
-  GitHub Actions status and an audio spectrum visualizer. Several modes can take turns in a
+  now playing (cover and track from any MPRIS player), Pomodoro, Claude Code statistics
+  (tokens, sessions and plan limits, six looks), GitHub Actions status and an audio spectrum
+  visualizer. Several modes can take turns in a
   **rotation**.
 - 🤖 **Claude Code status.** One click installs hooks into `~/.claude/settings.json`; from then on
   the speaker shows whether Claude is working, resting or **waiting for you** — with the project

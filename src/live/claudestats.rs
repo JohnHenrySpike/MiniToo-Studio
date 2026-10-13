@@ -1,8 +1,10 @@
 //! Статистика Claude (`claudestats`, §8.6): today's tokens from Claude Code transcripts
-//! (`~/.claude/projects/**/*.jsonl`, read incrementally every 30 s) plus the live sessions.
+//! (`~/.claude/projects/**/*.jsonl`, read incrementally every 30 s), the live sessions and the
+//! subscription limits (`api/oauth/usage` with Claude Code's login, every 3 min), in one of
+//! six screen styles.
 
-use super::{LiveMode, ModeCx, ModeMsg};
-use crate::canvas::{r, Align, Canvas};
+use super::{ClaudeStatsView, LiveMode, ModeCommand, ModeCx, ModeMsg, ModeView};
+use crate::canvas::{r, Align, Canvas, LineCap};
 use crate::claude::{ClaudeState, Session};
 use crate::color::Color;
 use crate::fonts::FontSpec;
@@ -14,7 +16,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 const SCAN: u64 = 1;
+const LIMITS: u64 = 2;
 const EVERY: Duration = Duration::from_secs(30);
+const LIMITS_EVERY: Duration = Duration::from_secs(180);
 
 /// Today's totals.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -161,27 +165,437 @@ pub fn summary(t: &Totals) -> String {
     )
 }
 
+// ---------------------------------------------------------------------- plan limits
+
+/// One usage window of the subscription: the 5-hour session or the week.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Limit {
+    /// 0..100
+    pub pct: f32,
+    pub resets_at: Option<DateTime<Local>>,
+}
+
+/// The plan limits from `api/oauth/usage`; `None` = unknown.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Limits {
+    pub session: Option<Limit>,
+    pub week: Option<Limit>,
+}
+
+impl Limits {
+    pub fn known(&self) -> bool {
+        self.session.is_some() || self.week.is_some()
+    }
+}
+
+/// Parses an `api/oauth/usage` reply: `five_hour` / `seven_day` with `utilization` (percent)
+/// and `resets_at` (RFC 3339).
+pub fn parse_limits(v: &serde_json::Value) -> Limits {
+    let window = |k: &str| {
+        let o = v.get(k)?;
+        let pct = o.get("utilization")?.as_f64()? as f32;
+        let resets_at = o
+            .get("resets_at")
+            .and_then(|x| x.as_str())
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|t| t.with_timezone(&Local));
+        Some(Limit { pct, resets_at })
+    };
+    Limits { session: window("five_hour"), week: window("seven_day") }
+}
+
+/// The Claude Code login (`claudeAiOauth.accessToken` of `.credentials.json` in
+/// `$CLAUDE_CONFIG_DIR` or `~/.claude`); `None` without a subscription login or once it expired.
+pub fn oauth_token(now_ms: i64) -> Option<String> {
+    let dir = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from).or_else(|| dirs::home_dir().map(|h| h.join(".claude")))?;
+    let text = std::fs::read_to_string(dir.join(".credentials.json")).ok()?;
+    token_from(&serde_json::from_str(&text).ok()?, now_ms)
+}
+
+fn token_from(v: &serde_json::Value, now_ms: i64) -> Option<String> {
+    let o = v.get("claudeAiOauth")?;
+    let token = o.get("accessToken")?.as_str().filter(|t| !t.is_empty())?;
+    // Claude Code refreshes it on its next request; until then the old one is refused anyway
+    if o.get("expiresAt").and_then(|x| x.as_i64()).is_some_and(|exp| exp <= now_ms) {
+        return None;
+    }
+    Some(token.to_string())
+}
+
+enum LimitsReply {
+    Ok(Limits),
+    NoLogin,
+    Failed(String),
+}
+
+async fn fetch_limits(http: reqwest::Client) -> LimitsReply {
+    let Some(token) = oauth_token(Local::now().timestamp_millis()) else { return LimitsReply::NoLogin };
+    let req = http
+        .get("https://api.anthropic.com/api/oauth/usage")
+        .header("Authorization", format!("Bearer {token}"))
+        .header("anthropic-beta", "oauth-2025-04-20")
+        .header("User-Agent", "minitoo-studio")
+        .timeout(Duration::from_secs(20));
+    let resp = match req.send().await {
+        Ok(r) => r,
+        Err(e) => return LimitsReply::Failed(e.without_url().to_string()),
+    };
+    let code = resp.status();
+    if code == reqwest::StatusCode::UNAUTHORIZED {
+        return LimitsReply::NoLogin;
+    }
+    if !code.is_success() {
+        return LimitsReply::Failed(format!("HTTP {}", code.as_u16()));
+    }
+    match resp.json::<serde_json::Value>().await {
+        Ok(v) => {
+            let l = parse_limits(&v);
+            if l.known() { LimitsReply::Ok(l) } else { LimitsReply::Failed(tr!("claudestats.limits_format").to_string()) }
+        }
+        Err(e) => LimitsReply::Failed(e.without_url().to_string()),
+    }
+}
+
+/// A limit as drawn at `now`: a passed reset means a fresh window (0%).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Gauge {
+    pub pct: f32,
+    /// share of the window already elapsed (where an even pace would be), if the reset is known
+    pub pace: Option<f32>,
+    /// «4ч 38м» / «сегодня 19:00»
+    pub reset: String,
+}
+
+const HOUR: i64 = 3600;
+
+fn gauge(l: &Limit, window_secs: i64, countdown: bool, now: DateTime<Local>) -> Gauge {
+    let Some(at) = l.resets_at else { return Gauge { pct: l.pct, pace: None, reset: String::new() } };
+    let left = (at - now).num_seconds();
+    if left <= 0 {
+        return Gauge { pct: 0.0, pace: None, reset: String::new() };
+    }
+    let pace = Some((1.0 - left as f32 / window_secs as f32).clamp(0.0, 1.0));
+    let reset = if countdown { countdown_text(left) } else { when_text(at, now) };
+    Gauge { pct: l.pct, pace, reset }
+}
+
+/// «4ч 38м», «12м».
+pub fn countdown_text(secs: i64) -> String {
+    let mins = (secs + 59) / 60;
+    if mins >= 60 { tr!("claudestats.left_hm", h = mins / 60, m = mins % 60) } else { tr!("claudestats.left_m", m = mins) }
+}
+
+/// «сегодня 19:00», «завтра 19:00», «чт 19:00».
+pub fn when_text(at: DateTime<Local>, now: DateTime<Local>) -> String {
+    let time = crate::i18n::time_hm(&at);
+    let days = (at.date_naive() - now.date_naive()).num_days();
+    match days {
+        0 => tr!("claudestats.today_at", time = time),
+        1 => tr!("claudestats.tomorrow_at", time = time),
+        _ => tr!("claudestats.day_at", day = crate::i18n::weekday_short(&at), time = time),
+    }
+}
+
+/// Everything a screen shows.
+pub struct View<'a> {
+    pub sessions: &'a [Session],
+    pub totals: &'a Totals,
+    pub session: Option<Gauge>,
+    pub week: Option<Gauge>,
+}
+
+impl<'a> View<'a> {
+    pub fn new(sessions: &'a [Session], totals: &'a Totals, limits: &Limits, now: DateTime<Local>) -> Self {
+        View {
+            sessions,
+            totals,
+            session: limits.session.map(|l| gauge(&l, 5 * HOUR, true, now)),
+            week: limits.week.map(|l| gauge(&l, 7 * 24 * HOUR, false, now)),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------- drawing
+
+/// Screen styles, in the order of the picker.
+pub const STYLES: [&str; 6] = [
+    "modes.claudestats.style_bars",
+    "modes.claudestats.style_rings",
+    "modes.claudestats.style_big",
+    "modes.claudestats.style_side",
+    "modes.claudestats.style_pixels",
+    "modes.claudestats.style_classic",
+];
+
+const BG: Color = Color::rgb(18, 15, 22);
+const DIM: Color = Color::rgb(150, 145, 165);
+const HEAD: Color = Color::rgb(30, 18, 14);
+const TRACK: Color = Color::rgb(42, 37, 51);
+const RULE: Color = Color::rgb(55, 50, 65);
+const AMBER: Color = Color::rgb(240, 170, 60);
+const RED: Color = Color::rgb(230, 64, 48);
+
 fn state_color(s: ClaudeState) -> Color {
     match s {
-        ClaudeState::Alerting => Color::rgb(230, 64, 48),
+        ClaudeState::Alerting => RED,
         ClaudeState::Working => Color::ACCENT,
         ClaudeState::Chilling => Color::rgb(90, 120, 190),
     }
 }
 
-/// The statistics screen.
-pub fn frame(sessions: &[Session], t: &Totals) -> Frame {
-    let dim = Color::rgb(150, 145, 165);
-    let head = Color::rgb(30, 18, 14);
+/// Accent; amber from 70% or well ahead of an even pace; red from 90%.
+fn severity(g: &Gauge) -> Color {
+    if g.pct >= 90.0 {
+        RED
+    } else if g.pct >= 70.0 || g.pace.is_some_and(|p| g.pct / 100.0 > p + 0.15) {
+        AMBER
+    } else {
+        Color::ACCENT
+    }
+}
+
+fn pct_text(g: Option<&Gauge>) -> String {
+    g.map(|g| format!("{}%", g.pct.round() as i64)).unwrap_or_else(|| "—".into())
+}
+
+fn gauge_color(g: Option<&Gauge>) -> Color {
+    g.map(severity).unwrap_or(DIM)
+}
+
+fn reset_text(g: Option<&Gauge>) -> &str {
+    g.map(|g| g.reset.as_str()).unwrap_or("")
+}
+
+/// Horizontal bar with the pace tick.
+fn pace_bar(c: &mut Canvas, x: f32, y: f32, w: f32, h: f32, g: Option<&Gauge>) {
+    match g {
+        Some(g) => {
+            c.bar(x, y, w, h, g.pct / 100.0, severity(g), Some(TRACK));
+            if let Some(p) = g.pace {
+                c.fill_rect((x + w * p).round(), y - 2.0, 1.0, h + 4.0, Color::WHITE);
+            }
+        }
+        None => c.fill_round_rect(x, y, w, h, h / 2.0, TRACK),
+    }
+}
+
+fn header(c: &mut Canvas, h: f32, right: &str) {
+    c.fill_rect(0.0, 0.0, 160.0, h, Color::ACCENT);
+    c.text(r(6.0, 0.0, 110.0, h), Align::LEFT, "Claude Code", FontSpec::bold(11.0), HEAD);
+    c.text(r(90.0, 0.0, 64.0, h), Align::RIGHT, right, FontSpec::bold(11.0), HEAD);
+}
+
+/// Sessions as dots from `right_x` leftwards (at most 6).
+fn session_dots(c: &mut Canvas, right_x: f32, cy: f32, sessions: &[Session], ring: Option<Color>) {
+    let mut x = right_x;
+    for s in sessions.iter().take(6) {
+        if let Some(o) = ring {
+            c.fill_circle(x, cy, 4.0, o);
+        }
+        c.fill_circle(x, cy, 3.0, state_color(s.state));
+        x -= 9.0;
+    }
+}
+
+/// Session rows: dot, project, optionally the state on the right.
+#[allow(clippy::too_many_arguments)]
+fn session_rows(c: &mut Canvas, x: f32, y0: f32, w: f32, row: f32, max: usize, sessions: &[Session], states: bool) {
+    if sessions.is_empty() {
+        c.text(r(x, y0, w, row), Align::LEFT, tr!("claudestats.no_sessions"), FontSpec::sans(9.0), DIM);
+        return;
+    }
+    let mut y = y0;
+    for s in sessions.iter().take(max) {
+        let color = state_color(s.state);
+        c.fill_circle(x + 3.0, y + row / 2.0, 3.0, color);
+        let nf = FontSpec::bold(10.0);
+        let nw = if states { w * 0.6 } else { w - 10.0 };
+        c.text(r(x + 10.0, y, nw + 2.0, row), Align::LEFT, &Canvas::elide(&s.project(), nf, nw), nf, Color::WHITE);
+        if states {
+            c.text(r(x, y, w, row), Align::RIGHT, s.state.lower(), FontSpec::sans(9.0), color);
+        }
+        y += row;
+    }
+}
+
+/// The statistics screen in `style` (see [`STYLES`]).
+pub fn frame(style: i64, v: &View) -> Frame {
     let mut c = Canvas::device();
-    c.fill(Color::rgb(18, 15, 22));
+    match style {
+        1 => draw_rings(&mut c, v),
+        2 => draw_big(&mut c, v),
+        3 => draw_side(&mut c, v),
+        4 => draw_pixels(&mut c, v),
+        5 => draw_classic(&mut c, v),
+        _ => draw_bars(&mut c, v),
+    }
+    c.to_frame()
+}
+
+/// «Полосы»: two sessions, both limits as bars, today's tokens.
+fn draw_bars(c: &mut Canvas, v: &View) {
+    c.fill(BG);
+    header(c, 18.0, &v.sessions.len().to_string());
+    session_rows(c, 6.0, 20.0, 148.0, 15.0, 2, v.sessions, true);
+    c.line(6.0, 52.0, 154.0, 52.0, 1.0, RULE);
+    for (i, (label, g)) in [(tr!("claudestats.session"), v.session.as_ref()), (tr!("claudestats.week"), v.week.as_ref())].into_iter().enumerate() {
+        let y = 55.0 + i as f32 * 27.0;
+        let pf = FontSpec::bold(12.0);
+        let p = pct_text(g);
+        let pw = Canvas::text_width(&p, pf);
+        c.text(r(6.0, y, 60.0, 14.0), Align::LEFT, &p, pf, gauge_color(g));
+        c.text(r(10.0 + pw, y, 60.0, 14.0), Align::LEFT, label, FontSpec::sans(9.0), DIM);
+        c.text(r(70.0, y, 84.0, 14.0), Align::RIGHT, reset_text(g), FontSpec::sans(9.0), DIM);
+        pace_bar(c, 6.0, y + 16.0, 148.0, 5.0, g);
+    }
+    c.line(6.0, 108.0, 154.0, 108.0, 1.0, RULE);
+    let t = v.totals;
+    c.text(r(6.0, 110.0, 80.0, 16.0), Align::LEFT, &tr!("claudestats.tokens_short", total = compact(t.all())), FontSpec::bold(10.0), Color::WHITE);
+    c.text(r(70.0, 110.0, 84.0, 16.0), Align::RIGHT, &tr!("claudestats.today_replies", count = t.replies), FontSpec::sans(8.0), DIM);
+}
+
+fn ring(c: &mut Canvas, cx: f32, cy: f32, g: Option<&Gauge>, label: &str) {
+    let rad = 19.0;
+    c.arc(cx, cy, rad, 225.0, -270.0, 6.0, TRACK, LineCap::Round);
+    if let Some(g) = g {
+        c.arc(cx, cy, rad, 225.0, -270.0 * (g.pct / 100.0).clamp(0.0, 1.0), 6.0, severity(g), LineCap::Round);
+        if let Some(p) = g.pace {
+            let a = (225.0 - 270.0 * p).to_radians();
+            let (o, i) = (rad + 5.0, rad - 5.0);
+            c.line(cx + i * a.cos(), cy - i * a.sin(), cx + o * a.cos(), cy - o * a.sin(), 1.5, Color::WHITE);
+        }
+    }
+    c.text(r(cx - 22.0, cy - 9.0, 44.0, 18.0), Align::CENTER, &pct_text(g), FontSpec::bold(12.0), Color::WHITE);
+    c.text(r(cx - 30.0, cy + 20.0, 60.0, 12.0), Align::CENTER, label, FontSpec::sans(9.0), DIM);
+    c.text(r(cx - 39.0, cy + 32.0, 78.0, 12.0), Align::CENTER, reset_text(g), FontSpec::bold(9.0), Color::rgb(210, 205, 220));
+}
+
+/// «Кольца»: two ring gauges, sessions as dots in the header.
+fn draw_rings(c: &mut Canvas, v: &View) {
+    c.fill(BG);
+    header(c, 18.0, "");
+    session_dots(c, 152.0, 9.0, v.sessions, Some(HEAD));
+    ring(c, 40.0, 46.0, v.session.as_ref(), tr!("claudestats.five_hours"));
+    ring(c, 120.0, 46.0, v.week.as_ref(), tr!("claudestats.week"));
+    c.line(6.0, 108.0, 154.0, 108.0, 1.0, RULE);
+    c.text(r(6.0, 110.0, 60.0, 16.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), DIM);
+    c.text(r(50.0, 110.0, 104.0, 16.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(v.totals.all())), FontSpec::bold(11.0), Color::WHITE);
+}
+
+/// «Крупно»: the session limit in big digits, the week below.
+fn draw_big(c: &mut Canvas, v: &View) {
+    c.fill(BG);
+    c.text(r(6.0, 2.0, 100.0, 14.0), Align::LEFT, tr!("claudestats.five_hour_limit"), FontSpec::sans(9.0), DIM);
+    session_dots(c, 152.0, 9.0, v.sessions, None);
+    let s = v.session.as_ref();
+    c.text(r(4.0, 14.0, 92.0, 40.0), Align::LEFT, &pct_text(s), FontSpec::bold(36.0), gauge_color(s));
+    if s.is_some_and(|g| !g.reset.is_empty()) {
+        c.text(r(92.0, 20.0, 62.0, 12.0), Align::RIGHT, tr!("claudestats.resets_in"), FontSpec::sans(8.0), DIM);
+        c.text(r(80.0, 32.0, 74.0, 16.0), Align::RIGHT, reset_text(s), FontSpec::bold(13.0), Color::WHITE);
+    }
+    pace_bar(c, 6.0, 57.0, 148.0, 8.0, s);
+
+    let w = v.week.as_ref();
+    let label = tr!("claudestats.week");
+    let lf = FontSpec::sans(9.0);
+    c.text(r(6.0, 72.0, 60.0, 14.0), Align::LEFT, label, lf, DIM);
+    c.text(r(10.0 + Canvas::text_width(label, lf), 72.0, 40.0, 14.0), Align::LEFT, &pct_text(w), FontSpec::bold(11.0), gauge_color(w));
+    c.text(r(80.0, 72.0, 74.0, 14.0), Align::RIGHT, reset_text(w), lf, DIM);
+    pace_bar(c, 6.0, 88.0, 148.0, 4.0, w);
+
+    c.fill_rect(0.0, 104.0, 160.0, 24.0, Color::rgb(30, 26, 36));
+    c.text(r(6.0, 104.0, 70.0, 24.0), Align::LEFT, &trn!("claudestats.sessions", v.sessions.len()), FontSpec::sans(9.0), DIM);
+    c.text(r(60.0, 104.0, 94.0, 24.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(v.totals.all())), FontSpec::bold(11.0), Color::WHITE);
+}
+
+fn column(c: &mut Canvas, x: f32, top: f32, h: f32, w: f32, g: Option<&Gauge>, label: &str) {
+    c.fill_round_rect(x, top, w, h, 3.0, TRACK);
+    if let Some(g) = g {
+        let fh = (h * g.pct / 100.0).clamp(0.0, h);
+        if fh > 0.0 {
+            c.fill_round_rect(x, top + h - fh, w, fh, 3.0, severity(g));
+        }
+        if let Some(p) = g.pace {
+            c.fill_rect(x - 2.0, (top + h - h * p).round(), w + 4.0, 1.0, Color::WHITE);
+        }
+    }
+    c.text(r(x - 6.0, top + h + 2.0, w + 12.0, 12.0), Align::CENTER, &pct_text(g), FontSpec::bold(8.0), Color::WHITE);
+    let lw = crate::pixelfont::width(label, 0);
+    c.pixel_text((x + w / 2.0) as i32 - lw / 2, (top + h + 13.0) as i32, label, DIM, 0, 1);
+}
+
+/// «Сбоку»: the session list as before, two vertical columns on the right.
+fn draw_side(c: &mut Canvas, v: &View) {
+    c.fill(BG);
+    header(c, 18.0, &v.sessions.len().to_string());
+    session_rows(c, 6.0, 22.0, 100.0, 16.0, 4, v.sessions, false);
+    c.line(6.0, 92.0, 106.0, 92.0, 1.0, RULE);
+    c.text(r(6.0, 94.0, 60.0, 14.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), DIM);
+    c.text(r(6.0, 107.0, 104.0, 18.0), Align::LEFT, &tr!("claudestats.tokens_short", total = compact(v.totals.all())), FontSpec::bold(13.0), Color::WHITE);
+    c.line(112.0, 22.0, 112.0, 124.0, 1.0, RULE);
+    column(c, 120.0, 26.0, 72.0, 10.0, v.session.as_ref(), tr!("claudestats.col_session"));
+    column(c, 142.0, 26.0, 72.0, 10.0, v.week.as_ref(), tr!("claudestats.col_week"));
+}
+
+/// A 24-segment LED meter (green, amber from 65%, red from 85%) with the pace caret below.
+fn led_bar(c: &mut Canvas, x: i32, y: i32, g: Option<&Gauge>) {
+    const SEGS: i32 = 24;
+    let lit = g.map(|g| (g.pct / 100.0 * SEGS as f32).round() as i32).unwrap_or(0);
+    for i in 0..SEGS {
+        let f = i as f32 / SEGS as f32;
+        let on = if f >= 0.85 {
+            RED
+        } else if f >= 0.65 {
+            AMBER
+        } else {
+            Color::rgb(90, 200, 120)
+        };
+        c.fill_rect((x + i * 6) as f32, y as f32, 5.0, 9.0, if i < lit { on } else { on.with_alpha(40) });
+    }
+    if let Some(p) = g.and_then(|g| g.pace) {
+        let px = x + (p * (SEGS * 6) as f32) as i32;
+        c.fill_rect(px as f32 - 1.0, (y + 11) as f32, 3.0, 1.0, Color::WHITE);
+        c.fill_rect(px as f32, (y + 10) as f32, 1.0, 1.0, Color::WHITE);
+    }
+}
+
+/// «Пиксели»: LED meters in the 5×7 pixel font.
+fn draw_pixels(c: &mut Canvas, v: &View) {
+    c.fill(Color::rgb(8, 8, 10));
+    c.pixel_text(8, 3, "CLAUDE CODE", Color::ACCENT, 1, 1);
+    let mut x = 150;
+    for s in v.sessions.iter().take(8) {
+        c.fill_rect(x as f32, 5.0, 5.0, 5.0, state_color(s.state));
+        x -= 8;
+    }
+    let rows = [(tr!("claudestats.session_5h"), v.session.as_ref()), (tr!("claudestats.week"), v.week.as_ref())];
+    for (i, (label, g)) in rows.into_iter().enumerate() {
+        let y = 20 + i as i32 * 42;
+        c.pixel_text(8, y, &label.to_uppercase(), DIM, 1, 1);
+        let p = pct_text(g);
+        let p = if p == "—" { "-".to_string() } else { p };
+        c.pixel_text(152 - crate::pixelfont::width(&p, 1) * 2, y - 6, &p, Color::WHITE, 1, 2);
+        led_bar(c, 8, y + 14, g);
+        if let Some(g) = g.filter(|g| !g.reset.is_empty()) {
+            c.pixel_text(8, y + 27, &tr!("claudestats.reset", when = g.reset).to_uppercase(), Color::rgb(110, 105, 120), 0, 1);
+        }
+    }
+    c.fill_rect(0.0, 112.0, 160.0, 1.0, Color::rgb(40, 38, 46));
+    let today = format!("{} {}", tr!("claudestats.today"), tr!("claudestats.tokens_short", total = compact(v.totals.all())));
+    c.pixel_text(8, 115, &today.to_uppercase(), Color::rgb(200, 195, 210), 1, 1);
+}
+
+/// «Классика»: sessions and today's tokens, no limits.
+fn draw_classic(c: &mut Canvas, v: &View) {
+    let (sessions, t) = (v.sessions, v.totals);
+    c.fill(BG);
     c.fill_rect(0.0, 0.0, 160.0, 20.0, Color::ACCENT);
-    c.text(r(8.0, 0.0, 120.0, 20.0), Align::LEFT, "Claude Code", FontSpec::bold(12.0), head);
-    c.text(r(110.0, 0.0, 42.0, 20.0), Align::RIGHT, &sessions.len().to_string(), FontSpec::bold(12.0), head);
+    c.text(r(8.0, 0.0, 120.0, 20.0), Align::LEFT, "Claude Code", FontSpec::bold(12.0), HEAD);
+    c.text(r(110.0, 0.0, 42.0, 20.0), Align::RIGHT, &sessions.len().to_string(), FontSpec::bold(12.0), HEAD);
 
     let mut y = 26.0;
     if sessions.is_empty() {
-        c.text(r(8.0, y, 144.0, 18.0), Align::LEFT, tr!("claudestats.no_sessions"), FontSpec::sans(10.0), dim);
+        c.text(r(8.0, y, 144.0, 18.0), Align::LEFT, tr!("claudestats.no_sessions"), FontSpec::sans(10.0), DIM);
     }
     for s in sessions.iter().take(3) {
         let color = state_color(s.state);
@@ -192,16 +606,17 @@ pub fn frame(sessions: &[Session], t: &Totals) -> Frame {
         y += 20.0;
     }
     if sessions.len() > 3 {
-        c.text(r(22.0, y - 4.0, 130.0, 10.0), Align::LEFT, &tr!("claudestats.more", count = sessions.len() - 3), FontSpec::sans(8.0), dim);
+        c.text(r(22.0, y - 4.0, 130.0, 10.0), Align::LEFT, &tr!("claudestats.more", count = sessions.len() - 3), FontSpec::sans(8.0), DIM);
     }
 
-    c.line(8.0, 90.0, 152.0, 90.0, 1.0, Color::rgb(55, 50, 65));
-    c.text(r(8.0, 94.0, 60.0, 16.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), dim);
+    c.line(8.0, 90.0, 152.0, 90.0, 1.0, RULE);
+    c.text(r(8.0, 94.0, 60.0, 16.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), DIM);
     c.text(r(50.0, 92.0, 102.0, 18.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(t.all())), FontSpec::bold(13.0), Color::WHITE);
-    c.text(r(8.0, 111.0, 80.0, 14.0), Align::LEFT, &tr!("claudestats.replies", count = t.replies), FontSpec::sans(9.0), dim);
-    c.text(r(72.0, 111.0, 80.0, 14.0), Align::RIGHT, &tr!("claudestats.output", output = compact(t.output)), FontSpec::sans(9.0), dim);
-    c.to_frame()
+    c.text(r(8.0, 111.0, 80.0, 14.0), Align::LEFT, &tr!("claudestats.replies", count = t.replies), FontSpec::sans(9.0), DIM);
+    c.text(r(72.0, 111.0, 80.0, 14.0), Align::RIGHT, &tr!("claudestats.output", output = compact(t.output)), FontSpec::sans(9.0), DIM);
 }
+
+// ---------------------------------------------------------------------- the mode
 
 struct ScanMsg(Scanner);
 
@@ -209,6 +624,12 @@ pub struct ClaudeStats {
     /// `None` while a scan runs on the blocking pool
     scanner: Option<Scanner>,
     totals: Totals,
+    style: i64,
+    limits: Limits,
+    /// why the limits are missing (no subscription login, an HTTP error)
+    limits_error: Option<String>,
+    fetching: bool,
+    loaded: bool,
 }
 
 impl Default for ClaudeStats {
@@ -219,7 +640,22 @@ impl Default for ClaudeStats {
 
 impl ClaudeStats {
     pub fn new() -> Self {
-        ClaudeStats { scanner: Some(Scanner::default()), totals: Totals::default() }
+        ClaudeStats {
+            scanner: Some(Scanner::default()),
+            totals: Totals::default(),
+            style: 0,
+            limits: Limits::default(),
+            limits_error: None,
+            fetching: false,
+            loaded: false,
+        }
+    }
+
+    fn ensure_loaded(&mut self, cx: &ModeCx) {
+        if !self.loaded {
+            self.loaded = true;
+            self.style = cx.settings.int_in("claudestats/style", 0, 0, STYLES.len() as i64 - 1);
+        }
     }
 
     fn scan(&mut self, cx: &mut ModeCx) {
@@ -232,7 +668,30 @@ impl ClaudeStats {
             Box::new(ScanMsg(scanner)) as ModeMsg
         });
     }
+
+    fn fetch(&mut self, cx: &mut ModeCx) {
+        // the classic screen does not show them
+        if self.fetching || self.style == CLASSIC {
+            return;
+        }
+        self.fetching = true;
+        let http = cx.http().clone();
+        cx.spawn(async move { Box::new(fetch_limits(http).await) as ModeMsg });
+    }
+
+    fn status(&self, now: DateTime<Local>) -> String {
+        let mut s = summary(&self.totals);
+        if self.style != CLASSIC {
+            let v = View::new(&[], &self.totals, &self.limits, now);
+            if self.limits.known() {
+                s += &tr!("claudestats.limits_status", session = pct_text(v.session.as_ref()), week = pct_text(v.week.as_ref()));
+            }
+        }
+        s
+    }
 }
+
+const CLASSIC: i64 = 5;
 
 impl LiveMode for ClaudeStats {
     fn id(&self) -> &'static str {
@@ -249,42 +708,99 @@ impl LiveMode for ClaudeStats {
     }
 
     fn start(&mut self, cx: &mut ModeCx) {
-        // a scan still running when the mode stopped never came back: start over
+        self.ensure_loaded(cx);
+        // a scan or a request still running when the mode stopped never came back: start over
         if self.scanner.is_none() {
             self.scanner = Some(Scanner::default());
         }
+        self.fetching = false;
         self.scan(cx);
+        self.fetch(cx);
         cx.timer(EVERY, SCAN);
+        cx.timer(LIMITS_EVERY, LIMITS);
     }
 
     fn render(&mut self, cx: &mut ModeCx) {
-        cx.publish(frame(cx.sessions, &self.totals));
+        let now = cx.now();
+        cx.publish(frame(self.style, &View::new(cx.sessions, &self.totals, &self.limits, now)));
     }
 
     fn on_timer(&mut self, cx: &mut ModeCx, token: u64) {
-        if token == SCAN {
-            self.scan(cx);
-            cx.timer(EVERY, SCAN);
+        match token {
+            SCAN => {
+                self.scan(cx);
+                cx.timer(EVERY, SCAN);
+            }
+            LIMITS => {
+                self.fetch(cx);
+                cx.timer(LIMITS_EVERY, LIMITS);
+            }
+            _ => {}
         }
     }
 
     fn on_message(&mut self, cx: &mut ModeCx, msg: ModeMsg) {
-        let Ok(msg) = msg.downcast::<ScanMsg>() else { return };
-        let ScanMsg(scanner) = *msg;
-        self.totals = scanner.totals;
-        self.scanner = Some(scanner);
-        cx.set_status(summary(&self.totals));
+        let msg = match msg.downcast::<ScanMsg>() {
+            Ok(m) => {
+                let ScanMsg(scanner) = *m;
+                self.totals = scanner.totals;
+                self.scanner = Some(scanner);
+                let status = self.status(cx.now());
+                cx.set_status(status);
+                // also moves the reset countdown on
+                self.render(cx);
+                return;
+            }
+            Err(m) => m,
+        };
+        let Ok(reply) = msg.downcast::<LimitsReply>() else { return };
+        self.fetching = false;
+        match *reply {
+            LimitsReply::Ok(l) => {
+                self.limits = l;
+                self.limits_error = None;
+            }
+            LimitsReply::NoLogin => {
+                self.limits = Limits::default();
+                self.limits_error = Some(tr!("claudestats.limits_no_login").to_string());
+            }
+            // the last known values stay until the window resets
+            LimitsReply::Failed(e) => self.limits_error = Some(tr!("claudestats.limits_failed", error = e)),
+        }
+        let status = self.status(cx.now());
+        cx.set_status(status);
         self.render(cx);
     }
 
     fn on_sessions_changed(&mut self, cx: &mut ModeCx) {
         self.render(cx);
     }
+
+    fn command(&mut self, cx: &mut ModeCx, cmd: ModeCommand) {
+        self.ensure_loaded(cx);
+        // timers and requests only run while the mode is acquired; the host drops them otherwise
+        if let ModeCommand::ClaudeStatsStyle(s) = cmd {
+            let s = s.clamp(0, STYLES.len() as i64 - 1);
+            if s != self.style {
+                self.style = s;
+                cx.settings.set_int("claudestats/style", s);
+                self.fetch(cx);
+                let status = self.status(cx.now());
+                cx.set_status(status);
+                self.render(cx);
+            }
+        }
+    }
+
+    fn view(&self) -> ModeView {
+        ModeView::ClaudeStats(ClaudeStatsView { style: self.style, limits_error: self.limits_error.clone() })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
     use std::io::Write;
 
     #[test]
@@ -336,5 +852,76 @@ mod tests {
         assert_eq!(s.totals, Totals::default());
         assert!(summary(&Totals { input: 1200, output: 3400, ..Default::default() }).starts_with("сегодня: 4.6K токенов (вход 1.2K"));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn limit_reply() -> serde_json::Value {
+        serde_json::json!({
+            "five_hour": { "utilization": 14.0, "resets_at": "2026-10-13T13:10:00.452338+00:00" },
+            "seven_day": { "utilization": 56.0, "resets_at": "2026-10-13T14:00:00+00:00" },
+            "seven_day_opus": null
+        })
+    }
+
+    #[test]
+    fn parses_limits() {
+        let l = parse_limits(&limit_reply());
+        let s = l.session.unwrap();
+        assert_eq!(s.pct, 14.0);
+        assert_eq!(s.resets_at.unwrap().to_utc().to_rfc3339(), "2026-10-13T13:10:00.452338+00:00");
+        assert_eq!(l.week.unwrap().pct, 56.0);
+        assert!(!parse_limits(&serde_json::json!({ "five_hour": null })).known());
+    }
+
+    #[test]
+    fn reads_token() {
+        let v = serde_json::json!({ "claudeAiOauth": { "accessToken": "sk-ant-oat01-x", "expiresAt": 2000 } });
+        assert_eq!(token_from(&v, 1000).as_deref(), Some("sk-ant-oat01-x"));
+        assert_eq!(token_from(&v, 2000), None);
+        assert_eq!(token_from(&serde_json::json!({ "claudeAiOauth": { "accessToken": "" } }), 0), None);
+        assert_eq!(token_from(&serde_json::json!({}), 0), None);
+    }
+
+    #[test]
+    fn gauges_at_a_moment() {
+        crate::i18n::set_language("ru");
+        crate::i18n::set_formats("24", "auto");
+        let now = Local.with_ymd_and_hms(2026, 10, 13, 13, 32, 0).unwrap();
+        let l = Limit { pct: 14.0, resets_at: Some(now + chrono::Duration::minutes(4 * 60 + 38)) };
+        let g = gauge(&l, 5 * HOUR, true, now);
+        assert_eq!(g.reset, "4ч 38м");
+        assert!((g.pace.unwrap() - 22.0 / 300.0).abs() < 1e-4);
+        // a passed reset is a fresh window
+        let g = gauge(&l, 5 * HOUR, true, now + chrono::Duration::hours(5));
+        assert_eq!((g.pct, g.pace, g.reset.as_str()), (0.0, None, ""));
+        assert_eq!(countdown_text(59), "1м");
+        assert_eq!(countdown_text(3600), "1ч 0м");
+        let at = |d: u32, h: u32| Local.with_ymd_and_hms(2026, 10, d, h, 0, 0).unwrap();
+        assert_eq!(when_text(at(13, 19), now), "сегодня 19:00");
+        assert_eq!(when_text(at(14, 9), now), "завтра 09:00");
+        assert_eq!(when_text(at(15, 19), now), "чт 19:00");
+    }
+
+    #[test]
+    fn draws_every_style() {
+        crate::i18n::set_language("ru");
+        let now = Local::now();
+        let totals = Totals { input: 1200, output: 3400, cache_read: 1_500_000, replies: 3, ..Default::default() };
+        let limits = Limits {
+            session: Some(Limit { pct: 92.0, resets_at: Some(now + chrono::Duration::minutes(90)) }),
+            week: Some(Limit { pct: 40.0, resets_at: Some(now + chrono::Duration::days(3)) }),
+        };
+        let frames: Vec<Frame> = (0..STYLES.len() as i64).map(|s| frame(s, &View::new(&[], &totals, &limits, now))).collect();
+        for (i, a) in frames.iter().enumerate() {
+            for b in &frames[i + 1..] {
+                assert_ne!(a, b);
+            }
+        }
+        // no limits: the screens still draw (dashes instead of numbers)
+        let empty = Limits::default();
+        for s in 0..STYLES.len() as i64 {
+            let _ = frame(s, &View::new(&[], &totals, &empty, now));
+        }
+        // out of range falls back to the first style
+        assert_eq!(frame(99, &View::new(&[], &totals, &limits, now)), frames[0]);
     }
 }

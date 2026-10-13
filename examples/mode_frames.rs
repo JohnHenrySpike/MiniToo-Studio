@@ -4,7 +4,7 @@
 use chrono::{NaiveDate, NaiveDateTime};
 use minitoo::claude::{ClaudeState, Session};
 use minitoo::frame::Frame;
-use minitoo::live::claudestats::{self, Totals};
+use minitoo::live::claudestats::{self, Limit, Limits, Totals};
 use minitoo::live::clock::{Clock, Weather};
 use minitoo::live::github::{Github, Run};
 use minitoo::live::pomodoro::Pomodoro;
@@ -118,9 +118,15 @@ fn main() {
         s("aaaa1111", "/home/x/divoom-studio-rust", ClaudeState::Chilling),
     ];
     let totals = Totals { input: 1210, output: 4300, cache_read: 1_520_000, cache_write: 45000, replies: 2, prompts: 1 };
-    save(dir, "stats_claudestats", &claudestats::frame(&sessions, &totals));
-    save(dir, "stats0_claudestats", &claudestats::frame(&[], &totals));
-    save(dir, "stats3_claudestats", &claudestats::frame(&sessions[2..4], &totals));
+    let limit = |pct, mins| Some(Limit { pct, resets_at: Some(now + chrono::Duration::minutes(mins)) });
+    let calm = Limits { session: limit(14.0, 4 * 60 + 38), week: limit(56.0, 5 * 60 + 28) };
+    let hot = Limits { session: limit(92.0, 114), week: limit(71.0, 4 * 24 * 60) };
+    for style in 0..claudestats::STYLES.len() as i64 {
+        let v = |s, l| claudestats::View::new(s, &totals, l, now);
+        save(dir, &format!("stats{style}_claudestats"), &claudestats::frame(style, &v(&sessions, &calm)));
+        save(dir, &format!("stats{style}hot_claudestats"), &claudestats::frame(style, &v(&sessions[1..4], &hot)));
+        save(dir, &format!("stats{style}none_claudestats"), &claudestats::frame(style, &v(&[], &Limits::default())));
+    }
 
     // notification cards
     use minitoo::notify_card::{IconSource, render};

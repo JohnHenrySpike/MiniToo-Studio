@@ -3,7 +3,7 @@
 
 use super::area;
 use crate::api::{Command, DisplayMode, ModeInfo};
-use crate::live::{City, ClockView, GithubView, ModeCommand, ModeView, NowPlayingView, PomodoroView, RunState, VisualizerView};
+use crate::live::{City, ClaudeStatsView, ClockView, GithubView, ModeCommand, ModeView, NowPlayingView, PomodoroView, RunState, VisualizerView};
 use crate::ui::Cx;
 use crate::ui::pixel::{self, PixStyle};
 use crate::ui::theme::{WHITE, pal};
@@ -580,6 +580,32 @@ fn visualizer_settings(ui: &mut Ui, cx: &mut Cx, v: &VisualizerView) {
     );
 }
 
+fn claudestats_settings(ui: &mut Ui, cx: &mut Cx, v: &ClaudeStatsView, status: &str) {
+    let p = pal();
+    let names: Vec<&str> = crate::live::claudestats::STYLES.iter().map(|k| crate::i18n::tr(k)).collect();
+    let current = v.style.clamp(0, names.len() as i64 - 1) as usize;
+    let label = tr!("modes.claudestats.style");
+    let tabs: Vec<(&str, Option<&str>)> = names.iter().map(|n| (*n, None)).collect();
+    let picked = w::row(ui, 33.0, 10.0, |ui| {
+        w::text(ui, label, w::font(13.0), p.text);
+        // six names rarely fit as tabs; a drop-down then
+        if w::tabs_width(ui, &tabs) <= ui.available_width() {
+            w::tabs(ui, &tabs, current)
+        } else {
+            w::combo(ui, "claudestats-style", &names, current, ui.available_width().min(220.0))
+        }
+    });
+    if let Some(i) = picked {
+        send_mode(cx, "claudestats", ModeCommand::ClaudeStatsStyle(i as i64));
+    }
+    if let Some(e) = v.limits_error.as_ref().filter(|_| current != names.len() - 1) {
+        w::para(ui, e, w::font(13.0), p.danger);
+    }
+    let hint = tr!("modes.claudestats.hint");
+    let t = if status.is_empty() { hint.to_string() } else { format!("{status}\n\n{hint}") };
+    w::hint(ui, &t);
+}
+
 fn notify_settings(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
     let p = pal();
     let n = &cx.snap.notify;
@@ -641,13 +667,9 @@ fn settings_group(ui: &mut Ui, cx: &mut Cx, st: &mut State, selected: &str) {
             (ModeView::Pomodoro(v), _) => pomodoro_settings(ui, cx, v),
             (ModeView::Github(v), _) => github_settings(ui, cx, st, v),
             (ModeView::Visualizer(v), _) => visualizer_settings(ui, cx, v),
+            (ModeView::ClaudeStats(v), _) => claudestats_settings(ui, cx, v, &status),
             (_, "sysmon") => {
                 w::hint(ui, tr!("modes.sysmon.hint"));
-            }
-            (_, "claudestats") => {
-                let hint = tr!("modes.claudestats.hint");
-                let t = if status.is_empty() { hint.to_string() } else { format!("{status}\n\n{hint}") };
-                w::hint(ui, &t);
             }
             _ => {}
         }

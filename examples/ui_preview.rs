@@ -10,7 +10,7 @@ use minitoo::claude::{ClaudeState, Session};
 use minitoo::color::Color;
 use minitoo::fonts::FontSpec;
 use minitoo::frame::Frame;
-use minitoo::live::{City, ClockView, GithubView, ModeCommand, ModeView, NowPlayingView, PomodoroView, RepoView, RunState, VisualizerView};
+use minitoo::live::{City, ClaudeStatsView, ClockView, GithubView, ModeCommand, ModeView, NowPlayingView, PomodoroView, RepoView, RunState, VisualizerView};
 use minitoo::tr;
 use minitoo::ui::{UiExit, UiOptions};
 use parking_lot::RwLock;
@@ -97,24 +97,22 @@ fn pomodoro_frame() -> Frame {
     c.to_frame()
 }
 
-fn stats_frame() -> Frame {
-    let mut c = Canvas::device();
-    c.fill(Color::hex(0x120f16));
-    c.fill_rect(0.0, 0.0, 160.0, 20.0, Color::ACCENT);
-    c.text_tl(6.0, 3.0, "Claude Code", FontSpec::bold(12.0), Color::hex(0x1e120e));
-    c.text(r(120.0, 3.0, 34.0, 14.0), Align::RIGHT, "2", FontSpec::bold(12.0), Color::hex(0x1e120e));
-    let rows = [("divoom", loc("работает", "working"), Color::ACCENT), ("website", loc("ждёт вас", "needs you"), Color::hex(0xe64030))];
-    for (i, (p, s, col)) in rows.iter().enumerate() {
-        let y = 26.0 + i as f32 * 20.0;
-        c.fill_circle(10.0, y + 7.0, 4.0, *col);
-        c.text_tl(20.0, y, p, FontSpec::bold(11.0), Color::WHITE);
-        c.text(r(90.0, y, 64.0, 14.0), Align::RIGHT, s, FontSpec::sans(10.0), *col);
-    }
-    c.line(6.0, 90.0, 154.0, 90.0, 1.0, Color::hex(0x373241));
-    c.text_tl(6.0, 96.0, loc("сегодня", "today"), FontSpec::sans(9.0), Color::hex(0x9691a5));
-    c.text(r(60.0, 94.0, 94.0, 16.0), Align::RIGHT, loc("62.3M ток.", "62.3M tok."), FontSpec::bold(13.0), Color::WHITE);
-    c.text_tl(6.0, 114.0, loc("ответов 412", "replies 412"), FontSpec::sans(9.0), Color::hex(0x9691a5));
-    c.to_frame()
+fn stats_frame(style: i64) -> Frame {
+    use minitoo::live::claudestats::{self, Limit, Limits, Totals};
+    let now = chrono::Local::now();
+    let session = |id: &str, cwd: &str, state| Session {
+        id: id.into(),
+        cwd: cwd.into(),
+        state,
+        last_event: String::new(),
+        message: String::new(),
+        updated: now,
+    };
+    let sessions = [session("a", "/home/x/divoom", ClaudeState::Working), session("b", "/home/x/website", ClaudeState::Alerting)];
+    let totals = Totals { input: 510_000, output: 1_200_000, cache_read: 60_600_000, replies: 412, prompts: 37, ..Default::default() };
+    let limit = |pct, mins| Some(Limit { pct, resets_at: Some(now + chrono::Duration::minutes(mins)) });
+    let limits = Limits { session: limit(38.0, 2 * 60 + 12), week: limit(56.0, 3 * 24 * 60) };
+    claudestats::frame(style, &claudestats::View::new(&sessions, &totals, &limits, now))
 }
 
 fn github_frame() -> Frame {
@@ -238,8 +236,8 @@ fn build() -> Snapshot {
             tr!("claudestats.subtitle"),
             "sparkle",
             loc("сегодня: 62.3M токенов (вход 510K, выход 1.2M, кэш 60.6M), ответов 412, запросов 37", "today: 62.3M tokens (input 510K, output 1.2M, cache 60.6M), replies 412, requests 37"),
-            stats_frame(),
-            ModeView::None,
+            stats_frame(0),
+            ModeView::ClaudeStats(ClaudeStatsView::default()),
             false,
         ),
         mode(
@@ -621,6 +619,11 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
                     (ModeView::Pomodoro(p), ModeCommand::PomodoroLong(v)) => p.long_min = v,
                     (ModeView::NowPlaying(n), ModeCommand::PlayPause) => n.playing = !n.playing,
                     (ModeView::Visualizer(v), ModeCommand::VisualizerStyle(st)) => v.style = st,
+                    (ModeView::ClaudeStats(v), ModeCommand::ClaudeStatsStyle(st)) => {
+                        v.style = st;
+                        m.frame = Some(stats_frame(st));
+                        m.revision += 1;
+                    }
                     (ModeView::Github(g), ModeCommand::GithubRemove(r)) => g.repos.retain(|x| x.name != r),
                     (ModeView::Github(g), ModeCommand::GithubAdd(r)) => {
                         if !r.contains('/') {

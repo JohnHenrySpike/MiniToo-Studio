@@ -297,6 +297,14 @@ pub struct VisualizerView {
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
+pub struct ClaudeStatsView {
+    /// index into [`claudestats::STYLES`]
+    pub style: i64,
+    /// why the plan limits are missing
+    pub limits_error: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum ModeView {
     #[default]
     None,
@@ -305,6 +313,7 @@ pub enum ModeView {
     Pomodoro(PomodoroView),
     Github(GithubView),
     Visualizer(VisualizerView),
+    ClaudeStats(ClaudeStatsView),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -327,6 +336,7 @@ pub enum ModeCommand {
     GithubToken(String),
     GithubClearToken,
     VisualizerStyle(i64),
+    ClaudeStatsStyle(i64),
 }
 
 // ---------------------------------------------------------------------- host
