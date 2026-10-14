@@ -574,7 +574,10 @@ claudestats.sessions[one] = {n} сессия
 claudestats.sessions[few] = {n} сессии
 claudestats.sessions[many] = {n} сессий
 claudestats.limits_status = ; лимиты: 5 ч {session}, неделя {week}
-claudestats.limits_no_login = Лимиты не видны: Claude Code не вошёл по подписке Claude (или вход истёк — он обновится при следующем запуске Claude Code).
+claudestats.limits_no_login = Лимиты не видны: в Claude Code CLI нет входа. Запусти claude в терминале и выполни /login. Claude Desktop свой вход в этот файл не пишет.
+claudestats.limits_expired = Лимиты не видны: вход Claude Code CLI истёк. Запусти claude в терминале — он обновит вход (если попросит, выполни /login).
+claudestats.limits_refused = Лимиты не видны: сервер не принял вход Claude Code CLI. Запусти claude в терминале и выполни /login.
+claudestats.limits_too_many = Сервер лимитов просит запрашивать реже, следующая попытка через {min} мин.
 claudestats.limits_failed = Лимиты не обновились: {error}
 claudestats.limits_format = непонятный ответ сервера
 # ---------------------------------------------------------------- src/live/nowplaying.rs

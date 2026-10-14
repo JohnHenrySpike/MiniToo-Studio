@@ -19,6 +19,8 @@ const SCAN: u64 = 1;
 const LIMITS: u64 = 2;
 const EVERY: Duration = Duration::from_secs(30);
 const LIMITS_EVERY: Duration = Duration::from_secs(180);
+/// after a 429 the interval doubles, up to this
+const LIMITS_MAX: Duration = Duration::from_secs(15 * 60);
 
 /// Today's totals.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -204,32 +206,53 @@ pub fn parse_limits(v: &serde_json::Value) -> Limits {
     Limits { session: window("five_hour"), week: window("seven_day") }
 }
 
-/// The Claude Code login (`claudeAiOauth.accessToken` of `.credentials.json` in
-/// `$CLAUDE_CONFIG_DIR` or `~/.claude`); `None` without a subscription login or once it expired.
-pub fn oauth_token(now_ms: i64) -> Option<String> {
-    let dir = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from).or_else(|| dirs::home_dir().map(|h| h.join(".claude")))?;
-    let text = std::fs::read_to_string(dir.join(".credentials.json")).ok()?;
-    token_from(&serde_json::from_str(&text).ok()?, now_ms)
+/// Why there is no usable login.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NoLogin {
+    /// no file, or no token in it (never signed in, signed out, or the CLI dropped a login it
+    /// could not renew)
+    Missing,
+    /// the token expired: `claude` renews it on its next start while its refresh token lives
+    Expired,
+    /// the server refused the token
+    Refused,
 }
 
-fn token_from(v: &serde_json::Value, now_ms: i64) -> Option<String> {
-    let o = v.get("claudeAiOauth")?;
-    let token = o.get("accessToken")?.as_str().filter(|t| !t.is_empty())?;
-    // Claude Code refreshes it on its next request; until then the old one is refused anyway
+/// The Claude Code CLI login: `claudeAiOauth.accessToken` of `.credentials.json` in
+/// `$CLAUDE_CONFIG_DIR` or `~/.claude`. Claude Desktop keeps its own login and never writes
+/// this file, so with only the desktop app in use the CLI login runs out.
+pub fn oauth_token(now_ms: i64) -> Result<String, NoLogin> {
+    let dir = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from).or_else(|| dirs::home_dir().map(|h| h.join(".claude")));
+    let v = dir
+        .and_then(|d| std::fs::read_to_string(d.join(".credentials.json")).ok())
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .ok_or(NoLogin::Missing)?;
+    token_from(&v, now_ms)
+}
+
+fn token_from(v: &serde_json::Value, now_ms: i64) -> Result<String, NoLogin> {
+    let o = v.get("claudeAiOauth").ok_or(NoLogin::Missing)?;
+    let token = o.get("accessToken").and_then(|t| t.as_str()).filter(|t| !t.is_empty()).ok_or(NoLogin::Missing)?;
+    // the server would refuse it anyway
     if o.get("expiresAt").and_then(|x| x.as_i64()).is_some_and(|exp| exp <= now_ms) {
-        return None;
+        return Err(NoLogin::Expired);
     }
-    Some(token.to_string())
+    Ok(token.to_string())
 }
 
 enum LimitsReply {
     Ok(Limits),
-    NoLogin,
+    NoLogin(NoLogin),
+    /// 429: the endpoint wants fewer requests
+    TooMany,
     Failed(String),
 }
 
 async fn fetch_limits(http: reqwest::Client) -> LimitsReply {
-    let Some(token) = oauth_token(Local::now().timestamp_millis()) else { return LimitsReply::NoLogin };
+    let token = match oauth_token(Local::now().timestamp_millis()) {
+        Ok(t) => t,
+        Err(why) => return LimitsReply::NoLogin(why),
+    };
     let req = http
         .get("https://api.anthropic.com/api/oauth/usage")
         .header("Authorization", format!("Bearer {token}"))
@@ -241,8 +264,11 @@ async fn fetch_limits(http: reqwest::Client) -> LimitsReply {
         Err(e) => return LimitsReply::Failed(e.without_url().to_string()),
     };
     let code = resp.status();
-    if code == reqwest::StatusCode::UNAUTHORIZED {
-        return LimitsReply::NoLogin;
+    if code == reqwest::StatusCode::UNAUTHORIZED || code == reqwest::StatusCode::FORBIDDEN {
+        return LimitsReply::NoLogin(NoLogin::Refused);
+    }
+    if code == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        return LimitsReply::TooMany;
     }
     if !code.is_success() {
         return LimitsReply::Failed(format!("HTTP {}", code.as_u16()));
@@ -629,6 +655,10 @@ pub struct ClaudeStats {
     /// why the limits are missing (no subscription login, an HTTP error)
     limits_error: Option<String>,
     fetching: bool,
+    /// the polling interval, longer after a 429
+    every: Duration,
+    /// the next request is scheduled (a style change fetches too and must not start a second chain)
+    timer_pending: bool,
     loaded: bool,
 }
 
@@ -647,6 +677,8 @@ impl ClaudeStats {
             limits: Limits::default(),
             limits_error: None,
             fetching: false,
+            every: LIMITS_EVERY,
+            timer_pending: false,
             loaded: false,
         }
     }
@@ -669,6 +701,7 @@ impl ClaudeStats {
         });
     }
 
+    /// One request; its reply schedules the next.
     fn fetch(&mut self, cx: &mut ModeCx) {
         // the classic screen does not show them
         if self.fetching || self.style == CLASSIC {
@@ -693,6 +726,14 @@ impl ClaudeStats {
 
 const CLASSIC: i64 = 5;
 
+fn no_login_text(why: NoLogin) -> &'static str {
+    match why {
+        NoLogin::Missing => tr!("claudestats.limits_no_login"),
+        NoLogin::Expired => tr!("claudestats.limits_expired"),
+        NoLogin::Refused => tr!("claudestats.limits_refused"),
+    }
+}
+
 impl LiveMode for ClaudeStats {
     fn id(&self) -> &'static str {
         "claudestats"
@@ -714,10 +755,10 @@ impl LiveMode for ClaudeStats {
             self.scanner = Some(Scanner::default());
         }
         self.fetching = false;
+        self.timer_pending = false;
         self.scan(cx);
         self.fetch(cx);
         cx.timer(EVERY, SCAN);
-        cx.timer(LIMITS_EVERY, LIMITS);
     }
 
     fn render(&mut self, cx: &mut ModeCx) {
@@ -732,8 +773,8 @@ impl LiveMode for ClaudeStats {
                 cx.timer(EVERY, SCAN);
             }
             LIMITS => {
+                self.timer_pending = false;
                 self.fetch(cx);
-                cx.timer(LIMITS_EVERY, LIMITS);
             }
             _ => {}
         }
@@ -755,17 +796,26 @@ impl LiveMode for ClaudeStats {
         };
         let Ok(reply) = msg.downcast::<LimitsReply>() else { return };
         self.fetching = false;
+        let previous = std::mem::replace(&mut self.every, LIMITS_EVERY);
         match *reply {
             LimitsReply::Ok(l) => {
                 self.limits = l;
                 self.limits_error = None;
             }
-            LimitsReply::NoLogin => {
+            LimitsReply::NoLogin(why) => {
                 self.limits = Limits::default();
-                self.limits_error = Some(tr!("claudestats.limits_no_login").to_string());
+                self.limits_error = Some(no_login_text(why).to_string());
             }
             // the last known values stay until the window resets
+            LimitsReply::TooMany => {
+                self.every = (previous * 2).min(LIMITS_MAX);
+                self.limits_error = Some(tr!("claudestats.limits_too_many", min = self.every.as_secs() / 60));
+            }
             LimitsReply::Failed(e) => self.limits_error = Some(tr!("claudestats.limits_failed", error = e)),
+        }
+        if !self.timer_pending {
+            self.timer_pending = true;
+            cx.timer(self.every, LIMITS);
         }
         let status = self.status(cx.now());
         cx.set_status(status);
@@ -875,10 +925,12 @@ mod tests {
     #[test]
     fn reads_token() {
         let v = serde_json::json!({ "claudeAiOauth": { "accessToken": "sk-ant-oat01-x", "expiresAt": 2000 } });
-        assert_eq!(token_from(&v, 1000).as_deref(), Some("sk-ant-oat01-x"));
-        assert_eq!(token_from(&v, 2000), None);
-        assert_eq!(token_from(&serde_json::json!({ "claudeAiOauth": { "accessToken": "" } }), 0), None);
-        assert_eq!(token_from(&serde_json::json!({}), 0), None);
+        assert_eq!(token_from(&v, 1000).as_deref(), Ok("sk-ant-oat01-x"));
+        assert_eq!(token_from(&v, 2000), Err(NoLogin::Expired));
+        // what the CLI leaves after a login it could not renew
+        let wiped = serde_json::json!({ "claudeAiOauth": { "accessToken": "", "refreshToken": "", "expiresAt": 0 } });
+        assert_eq!(token_from(&wiped, 0), Err(NoLogin::Missing));
+        assert_eq!(token_from(&serde_json::json!({}), 0), Err(NoLogin::Missing));
     }
 
     #[test]

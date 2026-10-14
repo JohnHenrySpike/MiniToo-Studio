@@ -573,7 +573,10 @@ claudestats.today_replies = today · {count} replies
 claudestats.sessions[one] = {n} session
 claudestats.sessions[other] = {n} sessions
 claudestats.limits_status = ; limits: 5h {session}, week {week}
-claudestats.limits_no_login = No limits: Claude Code is not signed in with a Claude subscription (or the login expired; it renews the next time Claude Code runs).
+claudestats.limits_no_login = No limits: Claude Code CLI is not signed in. Run claude in a terminal and use /login. Claude Desktop does not write its login to this file.
+claudestats.limits_expired = No limits: the Claude Code CLI login expired. Run claude in a terminal to renew it (use /login if it asks).
+claudestats.limits_refused = No limits: the server refused the Claude Code CLI login. Run claude in a terminal and use /login.
+claudestats.limits_too_many = The limits server asks for fewer requests; next try in {min} min.
 claudestats.limits_failed = Limits not updated: {error}
 claudestats.limits_format = unexpected server reply
 # ---------------------------------------------------------------- src/live/nowplaying.rs
