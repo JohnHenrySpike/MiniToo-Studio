@@ -419,8 +419,7 @@ fn header(c: &mut Canvas, h: f32, right: &str, agents: usize) {
 }
 
 const BADGE_FONT: FontSpec = FontSpec::bold(8.0);
-/// a little Claude (7×5): head with eyes, arms, legs
-const AGENT_GLYPH: [&str; 5] = [".#####.", ".#.#.#.", "#######", ".#####.", ".#.#.#."];
+use crate::faces::AGENT_GLYPH;
 const GLYPH_W: f32 = 7.0;
 
 /// Width of the agents badge; 0 without agents.

@@ -366,6 +366,7 @@ fn build() -> Snapshot {
             interrupt: true,
             idle_alerts: false,
             alert_caption: true,
+            agents_view: minitoo::faces::AgentsView::default(),
             scene_minutes: 5,
             scenes,
             port: 47800,
@@ -664,6 +665,7 @@ fn apply(s: &mut Snapshot, cmd: Command, timers: &mut Vec<(Instant, Command)>) {
         Command::SetInterrupt(b) => s.claude.interrupt = b,
         Command::SetIdleAlerts(b) => s.claude.idle_alerts = b,
         Command::SetAlertCaption(b) => s.claude.alert_caption = b,
+        Command::SetAgentsView(v) => s.claude.agents_view = v,
         Command::SetSceneMinutes(m) => s.claude.scene_minutes = m,
         Command::SetPort(p) => s.claude.port = p,
         Command::ClearSessions => {

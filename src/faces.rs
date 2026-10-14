@@ -1465,6 +1465,204 @@ pub fn draw_caption(frames: &[Frame], line1: &str, line2: &str) -> Vec<Frame> {
         .collect()
 }
 
+// ------------------------------------------------------------------------------------------ agents
+
+/// How the running subagents show on the status scenes (§11.8, `claude/agentsView`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum AgentsView {
+    Off,
+    /// a pill in the top-right corner
+    Badge,
+    /// a little Claude per agent along the bottom
+    #[default]
+    Crowd,
+    /// a strip at the bottom: «8 агентов · 3 сессии»
+    Caption,
+    /// a stack of segments on the right edge
+    Column,
+    /// every ~12 s a card for 2 s, baked into the loop (not over «ждёт вас»)
+    Card,
+}
+
+impl AgentsView {
+    pub const ALL: [AgentsView; 6] =
+        [AgentsView::Off, AgentsView::Badge, AgentsView::Crowd, AgentsView::Caption, AgentsView::Column, AgentsView::Card];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            AgentsView::Off => "off",
+            AgentsView::Badge => "badge",
+            AgentsView::Crowd => "crowd",
+            AgentsView::Caption => "caption",
+            AgentsView::Column => "column",
+            AgentsView::Card => "card",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|v| v.id() == s)
+    }
+
+    pub fn title(self) -> &'static str {
+        match self {
+            AgentsView::Off => tr!("claude.agents_view.off"),
+            AgentsView::Badge => tr!("claude.agents_view.badge"),
+            AgentsView::Crowd => tr!("claude.agents_view.crowd"),
+            AgentsView::Caption => tr!("claude.agents_view.caption"),
+            AgentsView::Column => tr!("claude.agents_view.column"),
+            AgentsView::Card => tr!("claude.agents_view.card"),
+        }
+    }
+}
+
+/// A little Claude (7×5): head with eyes, arms, legs. Also the agents badge of the statistics.
+pub const AGENT_GLYPH: [&str; 5] = [".#####.", ".#.#.#.", "#######", ".#####.", ".#.#.#."];
+
+pub fn draw_agent_glyph(c: &mut Canvas, x: i32, y: i32, zoom: i32, color: Color) {
+    for (ry, row) in AGENT_GLYPH.iter().enumerate() {
+        for (rx, ch) in row.chars().enumerate() {
+            if ch == '#' {
+                c.fill_rect((x + rx as i32 * zoom) as f32, (y + ry as i32 * zoom) as f32, zoom as f32, zoom as f32, color);
+            }
+        }
+    }
+}
+
+/// The height of the alert caption band (§11.5).
+fn caption_band() -> i32 {
+    2 * crate::pixelfont::HEIGHT + 3
+}
+
+/// Adds the running subagents to the frames of a scene: `agents` in `sessions` sessions.
+/// Nothing while chilling or without agents; the card not over «ждёт вас». `caption`: the alert
+/// caption will take the bottom, so bottom overlays sit above it. `speed`: ms per frame (the
+/// card is baked into the loop, which the speaker plays by itself). Returns the frames as they
+/// were when there is nothing to add.
+pub fn draw_agents(frames: &[Frame], view: AgentsView, state: ClaudeState, agents: usize, sessions: usize, caption: bool, speed: u32) -> Vec<Frame> {
+    if view == AgentsView::Off || state == ClaudeState::Chilling || agents == 0 || frames.is_empty() {
+        return frames.to_vec();
+    }
+    let bottom = HEIGHT as i32 - if caption { caption_band() } else { 0 };
+    match view {
+        AgentsView::Card if state == ClaudeState::Working => {
+            if let Some(v) = with_card(frames, agents, sessions, speed) {
+                return v;
+            }
+            // a long custom GIF leaves no room in the loop: the badge instead
+            overlay(frames, |c, _| badge(c, agents))
+        }
+        AgentsView::Card => frames.to_vec(),
+        AgentsView::Badge => overlay(frames, |c, _| badge(c, agents)),
+        AgentsView::Crowd => overlay(frames, |c, i| crowd(c, agents, bottom, i)),
+        AgentsView::Caption => overlay(frames, |c, _| strip(c, agents, sessions, bottom)),
+        AgentsView::Column => overlay(frames, |c, _| column(c, agents, bottom)),
+        AgentsView::Off => frames.to_vec(),
+    }
+}
+
+fn overlay(frames: &[Frame], draw: impl Fn(&mut Canvas, usize)) -> Vec<Frame> {
+    frames
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let mut c = Canvas::from_frame(f);
+            draw(&mut c, i);
+            c.to_frame()
+        })
+        .collect()
+}
+
+fn badge(c: &mut Canvas, n: usize) {
+    let text = n.to_string();
+    let font = FontSpec::bold(10.0);
+    let w = (6.0 + 14.0 + 3.0 + Canvas::text_width(&text, font) + 6.0).round();
+    let x = WIDTH as f32 - 4.0 - w;
+    c.fill_round_rect(x, 4.0, w, 16.0, 8.0, Color::rgba(0, 0, 0, 190));
+    draw_agent_glyph(c, x as i32 + 6, 7, 2, Color::ACCENT);
+    c.text(r(x + 23.0, 4.0, w, 16.0), Align::LEFT, &text, font, Color::WHITE);
+}
+
+/// Up to 8 little Claudes stepping in turn, then «+N».
+fn crowd(c: &mut Canvas, n: usize, bottom: i32, frame: usize) {
+    const MAX: usize = 8;
+    const STEP: i32 = 17;
+    let shown = n.min(MAX);
+    let more = if n > MAX { format!("+{}", n - MAX) } else { String::new() };
+    let more_w = if more.is_empty() { 0 } else { crate::pixelfont::width(&more, 0) + 4 };
+    let total = shown as i32 * STEP - 3 + more_w;
+    let mut x = (WIDTH as i32 - total) / 2;
+    let top = bottom - 15;
+    c.fill_rect(0.0, top as f32, WIDTH as f32, 15.0, Color::rgba(0, 0, 0, 170));
+    for i in 0..shown {
+        let color = if i % 3 == 1 { Color::ACCENT.lighter(1.25) } else { Color::ACCENT };
+        let bob = ((i + frame) % 2) as i32;
+        draw_agent_glyph(c, x, top + 2 + bob, 2, color);
+        x += STEP;
+    }
+    if !more.is_empty() {
+        crate::pixelfont::draw(c, x + 1, top + 3, &more, Color::WHITE, 0, 1);
+    }
+}
+
+fn strip(c: &mut Canvas, n: usize, sessions: usize, bottom: i32) {
+    let top = bottom - 12;
+    c.fill_rect(0.0, top as f32, WIDTH as f32, 12.0, Color::rgba(0, 0, 0, 200));
+    draw_agent_glyph(c, 4, top + 3, 1, Color::ACCENT);
+    let text = format!("{} · {}", trn!("claudestats.agents", n), trn!("claudestats.sessions", sessions));
+    let caps = text.to_uppercase();
+    if crate::pixelfont::covers(&caps) {
+        let line = crate::pixelfont::elided(&caps, 0, WIDTH as i32 - 18);
+        crate::pixelfont::draw(c, 14, top + 1, &line, Color::WHITE, 0, 1);
+    } else {
+        let font = FontSpec::bold(9.0);
+        c.text(r(14.0, top as f32, WIDTH as f32 - 18.0, 12.0), Align::LEFT, &Canvas::elide(&text, font, WIDTH as f32 - 18.0), font, Color::WHITE);
+    }
+}
+
+/// A segment per agent from the bottom up, the count on top.
+fn column(c: &mut Canvas, n: usize, bottom: i32) {
+    let x = WIDTH as i32 - 11;
+    c.fill_rect(x as f32, 0.0, 11.0, bottom as f32, Color::rgba(0, 0, 0, 150));
+    let text = n.to_string();
+    crate::pixelfont::draw(c, WIDTH as i32 - 1 - crate::pixelfont::width(&text, 0), 1, &text, Color::WHITE, 0, 1);
+    let room = ((bottom - 4 - 12) / 10).max(0) as usize;
+    for i in 0..n.min(room) as i32 {
+        let y = bottom - 4 - (i + 1) * 10;
+        c.fill_rect((x + 2) as f32, y as f32, 7.0, 8.0, Color::ACCENT);
+        draw_agent_glyph(c, x + 2, y + 2, 1, Color::rgb(30, 18, 14));
+    }
+}
+
+/// The card: a big little Claude, the count, «агентов работают / в N сессиях».
+pub fn agents_card(n: usize, sessions: usize) -> Frame {
+    let mut c = Canvas::device();
+    c.fill(Color::rgb(18, 15, 22));
+    draw_agent_glyph(&mut c, WIDTH as i32 / 2 - 21, 18, 6, Color::ACCENT);
+    c.text(r(0.0, 54.0, WIDTH as f32, 44.0), Align::CENTER, &n.to_string(), FontSpec::bold(40.0), Color::WHITE);
+    c.text(r(0.0, 96.0, WIDTH as f32, 16.0), Align::CENTER, &trn!("claude.agents_card.working", n), FontSpec::sans(11.0), Color::rgb(200, 195, 210));
+    c.text(r(0.0, 110.0, WIDTH as f32, 14.0), Align::CENTER, &trn!("claude.agents_card.sessions", sessions), FontSpec::sans(9.0), Color::rgb(150, 145, 165));
+    c.to_frame()
+}
+
+/// The scene played over and over for ~12 s, then the card for ~2 s, within the speaker's
+/// frame limit. `None` if the scene is too long for that.
+fn with_card(frames: &[Frame], n: usize, sessions: usize, speed: u32) -> Option<Vec<Frame>> {
+    let speed = speed.max(20) as usize;
+    let card = 2000usize.div_ceil(speed).max(1);
+    let room = crate::protocol::MAX_FRAMES.checked_sub(card)?;
+    if frames.len() > room {
+        return None;
+    }
+    let repeats = (room / frames.len()).min(12_000usize.div_ceil(speed * frames.len())).max(1);
+    let mut out = Vec::with_capacity(frames.len() * repeats + card);
+    for _ in 0..repeats {
+        out.extend_from_slice(frames);
+    }
+    let f = agents_card(n, sessions);
+    out.extend(std::iter::repeat_n(f, card));
+    Some(out)
+}
+
 // ------------------------------------------------------------------------------------------ export
 
 /// Nearest-neighbour ×2 of a device frame (the size of the exported previews).
@@ -1616,6 +1814,42 @@ mod tests {
             }
         }
         assert!(mismatched.is_empty(), "differs from the reference:\n{}", mismatched.join("\n"));
+    }
+
+    #[test]
+    fn agents_overlays() {
+        crate::i18n::set_language("ru");
+        let scene = generate(ClaudeState::Working, "classic");
+        let speed = 150;
+        let plain = |v, st, n| draw_agents(&scene.frames, v, st, n, 2, false, speed);
+        // nothing to add
+        assert_eq!(plain(AgentsView::Off, ClaudeState::Working, 5), scene.frames);
+        assert_eq!(plain(AgentsView::Crowd, ClaudeState::Chilling, 5), scene.frames);
+        assert_eq!(plain(AgentsView::Crowd, ClaudeState::Working, 0), scene.frames);
+        assert_eq!(plain(AgentsView::Card, ClaudeState::Alerting, 5), scene.frames);
+        for v in [AgentsView::Badge, AgentsView::Crowd, AgentsView::Caption, AgentsView::Column] {
+            let out = plain(v, ClaudeState::Working, 5);
+            assert_eq!(out.len(), scene.frames.len());
+            assert_ne!(out, scene.frames, "{v:?}");
+            assert_ne!(plain(v, ClaudeState::Alerting, 5), scene.frames, "{v:?} also over «ждёт вас»");
+        }
+        // the card: the scene repeated, then ~2 s of card, within the frame limit
+        let out = plain(AgentsView::Card, ClaudeState::Working, 5);
+        assert!(out.len() <= crate::protocol::MAX_FRAMES);
+        assert_eq!(out[..scene.frames.len()], scene.frames[..]);
+        let card = agents_card(5, 2);
+        assert_eq!(out.iter().filter(|f| **f == card).count(), 2000usize.div_ceil(speed as usize));
+        assert_eq!(*out.last().unwrap(), card);
+        // too long a loop for the card: the badge
+        let long: Vec<Frame> = std::iter::repeat_n(scene.frames[0].clone(), crate::protocol::MAX_FRAMES).collect();
+        let out = draw_agents(&long, AgentsView::Card, ClaudeState::Working, 5, 2, false, speed);
+        assert_eq!(out, draw_agents(&long, AgentsView::Badge, ClaudeState::Working, 5, 2, false, speed));
+        // above the alert caption the crowd moves up
+        let low = draw_agents(&scene.frames, AgentsView::Crowd, ClaudeState::Alerting, 3, 1, false, speed);
+        let high = draw_agents(&scene.frames, AgentsView::Crowd, ClaudeState::Alerting, 3, 1, true, speed);
+        assert_ne!(low, high);
+        assert_eq!(AgentsView::parse("crowd"), Some(AgentsView::Crowd));
+        assert_eq!(AgentsView::parse("x"), None);
     }
 
     #[test]

@@ -86,7 +86,11 @@ fn status_card(ui: &mut Ui, cx: &mut Cx) {
                 w::plate(ui, tr!("claude_page.status.plate"));
                 w::pixel_text(ui, c.state.title(), PixStyle::new(13).zoom(3), state_color(&p, c.state));
                 let n = c.sessions.len();
-                let t = if n == 0 { tr!("claude_page.status.no_sessions").to_string() } else { trn!("claude_page.status.sessions", n) };
+                let mut t = if n == 0 { tr!("claude_page.status.no_sessions").to_string() } else { trn!("claude_page.status.sessions", n) };
+                let agents: usize = c.sessions.iter().map(|s| s.agents.len()).sum();
+                if agents > 0 {
+                    t += &format!(" · {}", trn!("claudestats.agents", agents));
+                }
                 w::text(ui, &t, w::font(13.0), p.text_dim);
                 if w::switch(ui, c.interrupt, tr!("claude_page.status.interrupt"), true).clicked() {
                     cx.send(Command::SetInterrupt(!c.interrupt));
@@ -98,6 +102,17 @@ fn status_card(ui: &mut Ui, cx: &mut Cx) {
                 let r = w::tip(r, tr!("claude_page.status.alert_caption_tip"));
                 if r.clicked() {
                     cx.send(Command::SetAlertCaption(!c.alert_caption));
+                }
+                let names: Vec<&str> = faces::AgentsView::ALL.iter().map(|v| v.title()).collect();
+                let current = faces::AgentsView::ALL.iter().position(|v| *v == c.agents_view).unwrap_or(0);
+                let label = tr!("claude_page.status.agents_view");
+                let picked = w::row(ui, 33.0, 10.0, |ui| {
+                    let r = w::text(ui, label, w::font(13.0), p.text);
+                    w::tip(r, tr!("claude_page.status.agents_view_tip"));
+                    w::combo(ui, "agents-view", &names, current, ui.available_width().min(180.0))
+                });
+                if let Some(i) = picked {
+                    cx.send(Command::SetAgentsView(faces::AgentsView::ALL[i]));
                 }
             });
         });

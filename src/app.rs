@@ -182,6 +182,8 @@ pub struct Controller {
     claude: ClaudeMonitor,
     claude_interrupt: bool,
     alert_caption: bool,
+    /// how running subagents show on the scenes (§11.8)
+    agents_view: faces::AgentsView,
     sounds: bool,
     /// chosen sound per state (`sound::variants` id or `sound::OFF`)
     sound_variants: HashMap<ClaudeState, String>,
@@ -194,6 +196,8 @@ pub struct Controller {
     faces: Faces,
     shown_face: Option<ClaudeState>,
     shown_caption: Option<(String, String)>,
+    /// the agents drawn on the shown scene: (view, agents, sessions with agents)
+    shown_agents: (faces::AgentsView, usize, usize),
     variant_state: Option<ClaudeState>,
     port: u16,
     listening: bool,
@@ -387,6 +391,7 @@ impl Controller {
             claude: ClaudeMonitor::new(settings.bool("claude/idleAlerts", false)),
             claude_interrupt: settings.bool("claude/interrupt", true),
             alert_caption: settings.bool("claude/alertCaption", true),
+            agents_view: faces::AgentsView::parse(&settings.string("claude/agentsView", "")).unwrap_or_default(),
             sounds: settings.bool("claude/sounds", true),
             sound_variants: ClaudeState::ALL
                 .iter()
@@ -399,6 +404,7 @@ impl Controller {
             faces: Faces { cache: HashMap::new(), custom: HashMap::new(), current: HashMap::new(), bag: HashMap::new(), revision: 1 },
             shown_face: None,
             shown_caption: None,
+            shown_agents: (faces::AgentsView::Off, 0, 0),
             variant_state: None,
             port,
             listening: false,
@@ -1292,9 +1298,17 @@ impl Controller {
         self.claude.alert_caption()
     }
 
+    /// What the agents overlay of a scene depends on: (view, agents, sessions with agents).
+    fn agents_key(&self) -> (faces::AgentsView, usize, usize) {
+        let sessions = self.claude.sessions();
+        let busy = sessions.iter().filter(|s| !s.agents.is_empty()).count();
+        (self.agents_view, self.claude.agent_count(), busy)
+    }
+
     fn show_face(&mut self, state: ClaudeState) {
         let caption = if state == ClaudeState::Alerting { self.caption_lines() } else { None };
-        if Some(state) == self.shown_face && caption == self.shown_caption {
+        let agents = self.agents_key();
+        if Some(state) == self.shown_face && caption == self.shown_caption && agents == self.shown_agents {
             return;
         }
         if Some(state) != self.variant_state {
@@ -1305,14 +1319,17 @@ impl Controller {
         }
         self.shown_face = Some(state);
         self.shown_caption = caption.clone();
+        self.shown_agents = agents;
         let (frames, speed) = self.face(state);
         match &caption {
             Some((a, b)) => self.add_log(format!("Claude: {} — {a}: {b}", state.id())),
             None => self.add_log(format!("Claude: {}", state.id())),
         }
+        let (view, n, busy) = agents;
+        let frames = faces::draw_agents(&frames, view, state, n, busy, caption.is_some(), speed);
         let frames = match &caption {
             Some((a, b)) => faces::draw_caption(&frames, a, b),
-            None => frames.as_ref().clone(),
+            None => frames,
         };
         let level = self.zstd_level();
         self.submit(frames, speed, level, ColorDepth::Full, false);
@@ -1401,7 +1418,11 @@ impl Controller {
                 self.show_face(state);
                 self.shown_face = None;
             }
-        } else if alerting && self.interrupted && !self.overlay_active && self.caption_lines() != self.shown_caption {
+        } else if alerting
+            && self.interrupted
+            && !self.overlay_active
+            && (self.caption_lines() != self.shown_caption || self.agents_key() != self.shown_agents)
+        {
             self.show_face(state); // another session asks, or asks something else
             self.shown_face = None;
         } else if !alerting && self.interrupted {
@@ -2291,6 +2312,11 @@ impl Controller {
                 self.settings.set_bool("claude/alertCaption", v);
                 self.start_timer(TimerKind::ClaudeApply, 250);
             }
+            Command::SetAgentsView(v) => {
+                self.agents_view = v;
+                self.settings.set_string("claude/agentsView", v.id());
+                self.start_timer(TimerKind::ClaudeApply, 250);
+            }
             Command::SetSounds(v) => {
                 self.sounds = v;
                 self.settings.set_bool("claude/sounds", v);
@@ -2747,6 +2773,7 @@ impl Controller {
                 interrupt: self.claude_interrupt,
                 idle_alerts: self.claude.idle_alerts,
                 alert_caption: self.alert_caption,
+                agents_view: self.agents_view,
                 sounds: self.sounds,
                 sound_variants: ClaudeState::ALL.iter().map(|&s| (s, self.sound_variant(s))).collect(),
                 scene_minutes: self.scene_minutes,

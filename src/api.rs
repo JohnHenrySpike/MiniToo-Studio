@@ -261,6 +261,7 @@ pub struct ClaudeView {
     pub interrupt: bool,
     pub idle_alerts: bool,
     pub alert_caption: bool,
+    pub agents_view: crate::faces::AgentsView,
     pub sounds: bool,
     /// chosen sound per state (`sound::variants` id or `sound::OFF`)
     pub sound_variants: Vec<(ClaudeState, String)>,
@@ -466,6 +467,7 @@ pub enum Command {
     SetInterrupt(bool),
     SetIdleAlerts(bool),
     SetAlertCaption(bool),
+    SetAgentsView(crate::faces::AgentsView),
     SetSounds(bool),
     /// choose this state's sound (and play it)
     PickSound(ClaudeState, String),
