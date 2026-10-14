@@ -325,6 +325,8 @@ pub fn when_text(at: DateTime<Local>, now: DateTime<Local>) -> String {
 /// Everything a screen shows.
 pub struct View<'a> {
     pub sessions: &'a [Session],
+    /// running subagents in all sessions
+    pub agents: usize,
     pub totals: &'a Totals,
     pub session: Option<Gauge>,
     pub week: Option<Gauge>,
@@ -334,6 +336,7 @@ impl<'a> View<'a> {
     pub fn new(sessions: &'a [Session], totals: &'a Totals, limits: &Limits, now: DateTime<Local>) -> Self {
         View {
             sessions,
+            agents: sessions.iter().map(|s| s.agents.len()).sum(),
             totals,
             session: limits.session.map(|l| gauge(&l, 5 * HOUR, true, now)),
             week: limits.week.map(|l| gauge(&l, 7 * 24 * HOUR, false, now)),
@@ -405,22 +408,63 @@ fn pace_bar(c: &mut Canvas, x: f32, y: f32, w: f32, h: f32, g: Option<&Gauge>) {
     }
 }
 
-fn header(c: &mut Canvas, h: f32, right: &str) {
+/// Accent header; `right` (the session count) on the right, the agents badge left of it.
+fn header(c: &mut Canvas, h: f32, right: &str, agents: usize) {
     c.fill_rect(0.0, 0.0, 160.0, h, Color::ACCENT);
-    c.text(r(6.0, 0.0, 110.0, h), Align::LEFT, "Claude Code", FontSpec::bold(11.0), HEAD);
-    c.text(r(90.0, 0.0, 64.0, h), Align::RIGHT, right, FontSpec::bold(11.0), HEAD);
+    let font = FontSpec::bold(11.0);
+    c.text(r(6.0, 0.0, 110.0, h), Align::LEFT, "Claude Code", font, HEAD);
+    c.text(r(90.0, 0.0, 64.0, h), Align::RIGHT, right, font, HEAD);
+    let gap = if right.is_empty() { 0.0 } else { Canvas::text_width(right, font) + 5.0 };
+    agent_badge_right(c, 154.0 - gap, h / 2.0, agents, true);
 }
 
-/// Sessions as dots from `right_x` leftwards (at most 6).
-fn session_dots(c: &mut Canvas, right_x: f32, cy: f32, sessions: &[Session], ring: Option<Color>) {
+const BADGE_FONT: FontSpec = FontSpec::bold(8.0);
+/// a little Claude (7×5): head with eyes, arms, legs
+const AGENT_GLYPH: [&str; 5] = [".#####.", ".#.#.#.", "#######", ".#####.", ".#.#.#."];
+const GLYPH_W: f32 = 7.0;
+
+/// Width of the agents badge; 0 without agents.
+fn badge_width(n: usize) -> f32 {
+    if n == 0 { 0.0 } else { (4.0 + GLYPH_W + 2.0 + Canvas::text_width(&n.to_string(), BADGE_FONT) + 4.0).round() }
+}
+
+/// «[glyph] N» pill with its left edge at `x`, centred on `cy`. `on_accent`: dark pill for
+/// the accent header, otherwise an accent-tinted one for the dark background.
+fn agent_badge(c: &mut Canvas, x: f32, cy: f32, n: usize, on_accent: bool) {
+    if n == 0 {
+        return;
+    }
+    let w = badge_width(n);
+    let (bg, fg) = if on_accent { (HEAD, Color::rgb(250, 200, 180)) } else { (Color::rgb(70, 42, 34), Color::rgb(245, 170, 140)) };
+    let (x, top) = (x.round(), (cy - 5.5).round());
+    c.fill_round_rect(x, top, w, 11.0, 5.5, bg);
+    for (ry, row) in AGENT_GLYPH.iter().enumerate() {
+        for (rx, ch) in row.chars().enumerate() {
+            if ch == '#' {
+                c.set_pixel(x as i32 + 4 + rx as i32, top as i32 + 3 + ry as i32, fg);
+            }
+        }
+    }
+    let tx = x + 4.0 + GLYPH_W + 2.0;
+    c.text(r(tx, top - 1.0, w, 13.0), Align::LEFT, &n.to_string(), BADGE_FONT, fg);
+}
+
+/// The badge ending at `right`.
+fn agent_badge_right(c: &mut Canvas, right: f32, cy: f32, n: usize, on_accent: bool) {
+    agent_badge(c, right - badge_width(n), cy, n, on_accent);
+}
+
+/// Sessions as dots from `right_x` leftwards (at most `max`). Returns the left edge drawn.
+fn session_dots(c: &mut Canvas, right_x: f32, cy: f32, sessions: &[Session], max: usize, ring: Option<Color>) -> f32 {
     let mut x = right_x;
-    for s in sessions.iter().take(6) {
+    for s in sessions.iter().take(max) {
         if let Some(o) = ring {
             c.fill_circle(x, cy, 4.0, o);
         }
         c.fill_circle(x, cy, 3.0, state_color(s.state));
         x -= 9.0;
     }
+    x + 9.0 - 4.0
 }
 
 /// Session rows: dot, project, optionally the state on the right.
@@ -435,8 +479,11 @@ fn session_rows(c: &mut Canvas, x: f32, y0: f32, w: f32, row: f32, max: usize, s
         let color = state_color(s.state);
         c.fill_circle(x + 3.0, y + row / 2.0, 3.0, color);
         let nf = FontSpec::bold(10.0);
-        let nw = if states { w * 0.6 } else { w - 10.0 };
-        c.text(r(x + 10.0, y, nw + 2.0, row), Align::LEFT, &Canvas::elide(&s.project(), nf, nw), nf, Color::WHITE);
+        let bw = badge_width(s.agents.len());
+        let nw = if states { w * 0.6 } else { w - 10.0 } - if bw > 0.0 { bw + 4.0 } else { 0.0 };
+        let name = Canvas::elide(&s.project(), nf, nw);
+        c.text(r(x + 10.0, y, nw + 2.0, row), Align::LEFT, &name, nf, Color::WHITE);
+        agent_badge(c, x + 10.0 + Canvas::text_width(&name, nf) + 4.0, y + row / 2.0, s.agents.len(), false);
         if states {
             c.text(r(x, y, w, row), Align::RIGHT, s.state.lower(), FontSpec::sans(9.0), color);
         }
@@ -461,7 +508,7 @@ pub fn frame(style: i64, v: &View) -> Frame {
 /// «Полосы»: two sessions, both limits as bars, today's tokens.
 fn draw_bars(c: &mut Canvas, v: &View) {
     c.fill(BG);
-    header(c, 18.0, &v.sessions.len().to_string());
+    header(c, 18.0, &v.sessions.len().to_string(), v.agents);
     session_rows(c, 6.0, 20.0, 148.0, 15.0, 2, v.sessions, true);
     c.line(6.0, 52.0, 154.0, 52.0, 1.0, RULE);
     for (i, (label, g)) in [(tr!("claudestats.session"), v.session.as_ref()), (tr!("claudestats.week"), v.week.as_ref())].into_iter().enumerate() {
@@ -499,8 +546,13 @@ fn ring(c: &mut Canvas, cx: f32, cy: f32, g: Option<&Gauge>, label: &str) {
 /// «Кольца»: two ring gauges, sessions as dots in the header.
 fn draw_rings(c: &mut Canvas, v: &View) {
     c.fill(BG);
-    header(c, 18.0, "");
-    session_dots(c, 152.0, 9.0, v.sessions, Some(HEAD));
+    header(c, 18.0, "", 0);
+    // the badge and the dots share the room right of the title
+    let title_end = 6.0 + Canvas::text_width("Claude Code", FontSpec::bold(11.0)) + 4.0;
+    let bw = badge_width(v.agents);
+    let room = 156.0 - title_end - if bw > 0.0 { bw + 4.0 } else { 0.0 };
+    let left = session_dots(c, 152.0, 9.0, v.sessions, ((room / 9.0) as usize).min(6), Some(HEAD));
+    agent_badge_right(c, left - 4.0, 9.0, v.agents, true);
     ring(c, 40.0, 46.0, v.session.as_ref(), tr!("claudestats.five_hours"));
     ring(c, 120.0, 46.0, v.week.as_ref(), tr!("claudestats.week"));
     c.line(6.0, 108.0, 154.0, 108.0, 1.0, RULE);
@@ -512,7 +564,7 @@ fn draw_rings(c: &mut Canvas, v: &View) {
 fn draw_big(c: &mut Canvas, v: &View) {
     c.fill(BG);
     c.text(r(6.0, 2.0, 100.0, 14.0), Align::LEFT, tr!("claudestats.five_hour_limit"), FontSpec::sans(9.0), DIM);
-    session_dots(c, 152.0, 9.0, v.sessions, None);
+    session_dots(c, 152.0, 9.0, v.sessions, 5, None);
     let s = v.session.as_ref();
     c.text(r(4.0, 14.0, 92.0, 40.0), Align::LEFT, &pct_text(s), FontSpec::bold(36.0), gauge_color(s));
     if s.is_some_and(|g| !g.reset.is_empty()) {
@@ -530,7 +582,10 @@ fn draw_big(c: &mut Canvas, v: &View) {
     pace_bar(c, 6.0, 88.0, 148.0, 4.0, w);
 
     c.fill_rect(0.0, 104.0, 160.0, 24.0, Color::rgb(30, 26, 36));
-    c.text(r(6.0, 104.0, 70.0, 24.0), Align::LEFT, &trn!("claudestats.sessions", v.sessions.len()), FontSpec::sans(9.0), DIM);
+    let who = trn!("claudestats.sessions", v.sessions.len());
+    let wf = FontSpec::sans(9.0);
+    c.text(r(6.0, 104.0, 70.0, 24.0), Align::LEFT, &who, wf, DIM);
+    agent_badge(c, 6.0 + Canvas::text_width(&who, wf) + 5.0, 116.0, v.agents, false);
     c.text(r(60.0, 104.0, 94.0, 24.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(v.totals.all())), FontSpec::bold(11.0), Color::WHITE);
 }
 
@@ -553,7 +608,7 @@ fn column(c: &mut Canvas, x: f32, top: f32, h: f32, w: f32, g: Option<&Gauge>, l
 /// «Сбоку»: the session list as before, two vertical columns on the right.
 fn draw_side(c: &mut Canvas, v: &View) {
     c.fill(BG);
-    header(c, 18.0, &v.sessions.len().to_string());
+    header(c, 18.0, &v.sessions.len().to_string(), v.agents);
     session_rows(c, 6.0, 22.0, 100.0, 16.0, 4, v.sessions, false);
     c.line(6.0, 92.0, 106.0, 92.0, 1.0, RULE);
     c.text(r(6.0, 94.0, 60.0, 14.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), DIM);
@@ -594,6 +649,21 @@ fn draw_pixels(c: &mut Canvas, v: &View) {
         c.fill_rect(x as f32, 5.0, 5.0, 5.0, state_color(s.state));
         x -= 8;
     }
+    // agents: the little glyph and the count, left of the squares
+    if v.agents > 0 {
+        let n = v.agents.to_string();
+        let right = x + 8 - 5;
+        let nx = right - crate::pixelfont::width(&n, 1);
+        c.pixel_text(nx, 3, &n, Color::ACCENT, 1, 1);
+        let gx = nx - GLYPH_W as i32 - 2;
+        for (ry, row) in AGENT_GLYPH.iter().enumerate() {
+            for (rx, ch) in row.chars().enumerate() {
+                if ch == '#' {
+                    c.set_pixel(gx + rx as i32, 5 + ry as i32, Color::ACCENT);
+                }
+            }
+        }
+    }
     let rows = [(tr!("claudestats.session_5h"), v.session.as_ref()), (tr!("claudestats.week"), v.week.as_ref())];
     for (i, (label, g)) in rows.into_iter().enumerate() {
         let y = 20 + i as i32 * 42;
@@ -617,7 +687,9 @@ fn draw_classic(c: &mut Canvas, v: &View) {
     c.fill(BG);
     c.fill_rect(0.0, 0.0, 160.0, 20.0, Color::ACCENT);
     c.text(r(8.0, 0.0, 120.0, 20.0), Align::LEFT, "Claude Code", FontSpec::bold(12.0), HEAD);
-    c.text(r(110.0, 0.0, 42.0, 20.0), Align::RIGHT, &sessions.len().to_string(), FontSpec::bold(12.0), HEAD);
+    let count = sessions.len().to_string();
+    c.text(r(110.0, 0.0, 42.0, 20.0), Align::RIGHT, &count, FontSpec::bold(12.0), HEAD);
+    agent_badge_right(c, 152.0 - Canvas::text_width(&count, FontSpec::bold(12.0)) - 5.0, 10.0, v.agents, true);
 
     let mut y = 26.0;
     if sessions.is_empty() {
@@ -627,7 +699,10 @@ fn draw_classic(c: &mut Canvas, v: &View) {
         let color = state_color(s.state);
         c.fill_circle(12.0, y + 9.0, 4.0, color);
         let name_font = FontSpec::bold(11.0);
-        c.text(r(22.0, y, 80.0, 18.0), Align::LEFT, &Canvas::elide(&s.project(), name_font, 78.0), name_font, Color::WHITE);
+        let bw = badge_width(s.agents.len());
+        let name = Canvas::elide(&s.project(), name_font, 78.0 - if bw > 0.0 { bw + 4.0 } else { 0.0 });
+        c.text(r(22.0, y, 80.0, 18.0), Align::LEFT, &name, name_font, Color::WHITE);
+        agent_badge(c, 22.0 + Canvas::text_width(&name, name_font) + 4.0, y + 9.0, s.agents.len(), false);
         c.text(r(96.0, y, 56.0, 18.0), Align::RIGHT, s.state.lower(), FontSpec::sans(10.0), color);
         y += 20.0;
     }
@@ -975,5 +1050,21 @@ mod tests {
         }
         // out of range falls back to the first style
         assert_eq!(frame(99, &View::new(&[], &totals, &limits, now)), frames[0]);
+        // running subagents show up in every style
+        let agent = |id: &str| crate::claude::Agent { id: id.into(), kind: String::new(), started: now, seen: now };
+        let session = |agents| Session {
+            id: "s".into(),
+            cwd: "/home/x/divoom".into(),
+            state: ClaudeState::Working,
+            last_event: String::new(),
+            message: String::new(),
+            updated: now,
+            agents,
+        };
+        let (idle, busy) = ([session(vec![])], [session(vec![agent("a"), agent("b")])]);
+        assert_eq!(View::new(&busy, &totals, &limits, now).agents, 2);
+        for s in 0..STYLES.len() as i64 {
+            assert_ne!(frame(s, &View::new(&idle, &totals, &limits, now)), frame(s, &View::new(&busy, &totals, &limits, now)), "style {s}");
+        }
     }
 }

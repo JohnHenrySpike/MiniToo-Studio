@@ -1,5 +1,6 @@
-//! Claude Code status (§11): hook events → per-session state, aggregation, timeouts, the alert
-//! caption, and installing the hooks into `~/.claude/settings.json`.
+//! Claude Code status (§11): hook events → per-session state and running subagents,
+//! aggregation, timeouts, the alert caption, and installing the hooks into
+//! `~/.claude/settings.json`.
 
 use chrono::{DateTime, Local};
 use serde_json::{Value, json};
@@ -8,8 +9,19 @@ use std::path::{Path, PathBuf};
 
 pub const WORKING_TIMEOUT_SECS: i64 = 15 * 60;
 pub const SESSION_TIMEOUT_SECS: i64 = 3 * 60 * 60;
-pub const HOOK_EVENTS: [&str; 7] =
-    ["SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification", "Stop"];
+/// A subagent with no event for this long is taken as finished (a missed `SubagentStop`).
+pub const AGENT_TIMEOUT_SECS: i64 = 15 * 60;
+pub const HOOK_EVENTS: [&str; 9] = [
+    "SessionStart",
+    "SessionEnd",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "Notification",
+    "Stop",
+    "SubagentStart",
+    "SubagentStop",
+];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum ClaudeState {
@@ -62,6 +74,17 @@ impl ClaudeState {
     }
 }
 
+/// A running subagent of a session (`agent_id` of the hooks).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Agent {
+    pub id: String,
+    /// `agent_type`: «Explore», «general-purpose», …
+    pub kind: String,
+    pub started: DateTime<Local>,
+    /// the last event from it
+    pub seen: DateTime<Local>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Session {
     pub id: String,
@@ -70,6 +93,8 @@ pub struct Session {
     pub last_event: String,
     pub message: String,
     pub updated: DateTime<Local>,
+    /// running subagents, oldest first
+    pub agents: Vec<Agent>,
 }
 
 impl Session {
@@ -88,6 +113,25 @@ impl Session {
             .unwrap_or_else(|| self.cwd.clone())
     }
 
+    /// A subagent event: adds the agent or marks it seen.
+    fn touch_agent(&mut self, id: &str, kind: &str, now: DateTime<Local>) {
+        match self.agents.iter_mut().find(|a| a.id == id) {
+            Some(a) => {
+                a.seen = now;
+                if a.kind.is_empty() {
+                    a.kind = kind.to_string();
+                }
+            }
+            None => self.agents.push(Agent { id: id.to_string(), kind: kind.to_string(), started: now, seen: now }),
+        }
+    }
+
+    fn remove_agent(&mut self, id: &str) -> bool {
+        let before = self.agents.len();
+        self.agents.retain(|a| a.id != id);
+        self.agents.len() != before
+    }
+
     pub fn to_json(&self) -> Value {
         json!({
             "id": self.id,
@@ -97,6 +141,12 @@ impl Session {
             "event": self.last_event,
             "message": self.message,
             "updated": self.updated.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            "agents": self.agents.iter().map(|a| json!({
+                "id": a.id,
+                "type": a.kind,
+                "started": a.started.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                "seen": a.seen.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            })).collect::<Vec<_>>(),
         })
     }
 }
@@ -123,6 +173,11 @@ impl ClaudeMonitor {
         self.sessions.values().map(|s| s.state).max().unwrap_or(ClaudeState::Chilling)
     }
 
+    /// Running subagents in all sessions.
+    pub fn agent_count(&self) -> usize {
+        self.sessions.values().map(|s| s.agents.len()).sum()
+    }
+
     /// Handles one hook body. Returns true if sessions changed.
     pub fn handle_hook(&mut self, hook: &Value, now: DateTime<Local>) -> bool {
         let s = |k: &str| hook.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -133,6 +188,11 @@ impl ClaudeMonitor {
         let tool = s("tool_name");
         if message.is_empty() && event == "PermissionRequest" && !tool.is_empty() {
             message = format!("Claude needs your permission to use {tool}");
+        }
+        // tool events from inside a subagent carry its `agent_id` too
+        let agent = s("agent_id");
+        if event == "SubagentStop" {
+            return !agent.is_empty() && self.sessions.get_mut(&id).is_some_and(|s| s.remove_agent(&agent));
         }
         let state = match event.as_str() {
             "SessionEnd" => return self.sessions.remove(&id).is_some(),
@@ -148,9 +208,14 @@ impl ClaudeMonitor {
                     ClaudeState::Alerting
                 }
             }
-            _ => return false, // SubagentStop and anything unknown: keep the current state
+            _ => return false, // anything unknown: keep the current state
         };
         self.set_session_state(&id, &cwd, state, &event, &message, now);
+        if !agent.is_empty()
+            && let Some(sess) = self.sessions.get_mut(&id)
+        {
+            sess.touch_agent(&agent, &s("agent_type"), now);
+        }
         true
     }
 
@@ -162,6 +227,7 @@ impl ClaudeMonitor {
             last_event: String::new(),
             message: String::new(),
             updated: now,
+            agents: Vec::new(),
         });
         if !cwd.is_empty() {
             s.cwd = cwd.to_string();
@@ -190,7 +256,8 @@ impl ClaudeMonitor {
         had
     }
 
-    /// Every 10 s: stuck `working` → `chilling` after 15 min, sessions older than 3 h removed.
+    /// Every 10 s: stuck `working` → `chilling` after 15 min, silent subagents dropped after
+    /// 15 min, sessions older than 3 h removed.
     pub fn expire(&mut self, now: DateTime<Local>) -> bool {
         let mut changed = false;
         self.sessions.retain(|_, s| {
@@ -199,6 +266,9 @@ impl ClaudeMonitor {
                 changed = true;
                 return false;
             }
+            let before = s.agents.len();
+            s.agents.retain(|a| (now - a.seen).num_seconds() <= AGENT_TIMEOUT_SECS);
+            changed |= s.agents.len() != before;
             if s.state == ClaudeState::Working && age > WORKING_TIMEOUT_SECS {
                 s.state = ClaudeState::Chilling;
                 changed = true;
@@ -223,6 +293,7 @@ impl ClaudeMonitor {
     pub fn status_json(&self) -> Value {
         json!({
             "state": self.state().id(),
+            "agents": self.agent_count(),
             "sessions": self.sessions().iter().map(|s| s.to_json()).collect::<Vec<_>>(),
         })
     }
@@ -371,19 +442,41 @@ pub fn uninstall_hooks_at(path: &Path) -> Result<String, String> {
     Ok(tr!("claude.hooks.removed").to_string())
 }
 
-/// «Установлены» = every one of the 7 events has our entry with the current port.
-pub fn hooks_installed_at(path: &Path, port: u16) -> bool {
-    let Ok(root) = read_settings(path) else { return false };
-    let Some(hooks) = root.get("hooks").and_then(|h| h.as_object()) else { return false };
-    HOOK_EVENTS.iter().all(|e| {
-        hooks.get(*e).and_then(|g| g.as_array()).is_some_and(|groups| {
+/// Our hooks in `settings.json`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum HooksState {
+    #[default]
+    Missing,
+    /// some of ours, but not every event of [`HOOK_EVENTS`] with the current port (an older
+    /// version of the app, or another port): «Установить хуки» brings them up to date
+    Outdated,
+    Installed,
+}
+
+pub fn hooks_state_at(path: &Path, port: u16) -> HooksState {
+    let Ok(root) = read_settings(path) else { return HooksState::Missing };
+    let Some(hooks) = root.get("hooks").and_then(|h| h.as_object()) else { return HooksState::Missing };
+    let has = |e: &str, own: &dyn Fn(&str) -> bool| {
+        hooks.get(e).and_then(|g| g.as_array()).is_some_and(|groups| {
             groups.iter().any(|g| {
-                g.get("hooks").and_then(|h| h.as_array()).is_some_and(|l| {
-                    l.iter().any(|h| h.get("command").and_then(|c| c.as_str()).is_some_and(|c| is_own_command_port(c, port)))
-                })
+                g.get("hooks")
+                    .and_then(|h| h.as_array())
+                    .is_some_and(|l| l.iter().any(|h| h.get("command").and_then(|c| c.as_str()).is_some_and(own)))
             })
         })
-    })
+    };
+    if HOOK_EVENTS.iter().all(|e| has(e, &|c| is_own_command_port(c, port))) {
+        HooksState::Installed
+    } else if hooks.keys().any(|e| has(e, &is_own_command)) {
+        HooksState::Outdated
+    } else {
+        HooksState::Missing
+    }
+}
+
+/// «Установлены» = every event of [`HOOK_EVENTS`] has our entry with the current port.
+pub fn hooks_installed_at(path: &Path, port: u16) -> bool {
+    hooks_state_at(path, port) == HooksState::Installed
 }
 
 pub fn install_hooks(port: u16) -> Result<String, String> {
@@ -392,8 +485,8 @@ pub fn install_hooks(port: u16) -> Result<String, String> {
 pub fn uninstall_hooks() -> Result<String, String> {
     uninstall_hooks_at(&claude_settings_path())
 }
-pub fn hooks_installed(port: u16) -> bool {
-    hooks_installed_at(&claude_settings_path(), port)
+pub fn hooks_state(port: u16) -> HooksState {
+    hooks_state_at(&claude_settings_path(), port)
 }
 
 #[cfg(test)]
@@ -429,7 +522,8 @@ mod tests {
         // idle prompt is not an alarm by default
         m.handle_hook(&hook("Notification", "c", json!({"notification_type": "idle_prompt"})), now);
         assert_eq!(m.sessions().iter().find(|s| s.id == "c").unwrap().state, ClaudeState::Chilling);
-        m.handle_hook(&hook("SubagentStop", "b", json!({})), now);
+        // a subagent finishing leaves the session's state alone
+        m.handle_hook(&hook("SubagentStop", "b", json!({"agent_id": "x"})), now);
         assert_eq!(m.sessions().iter().find(|s| s.id == "b").unwrap().state, ClaudeState::Working);
         m.handle_hook(&hook("SessionEnd", "a", json!({})), now);
         assert_eq!(m.state(), ClaudeState::Working);
@@ -441,6 +535,34 @@ mod tests {
         m.handle_hook(&hook("Notification", "x", json!({"message": "Claude is waiting for your input"})), Local::now());
         assert_eq!(m.state(), ClaudeState::Alerting);
         assert_eq!(m.alert_caption().unwrap().1, "Ждёт ответа");
+    }
+
+    #[test]
+    fn subagents() {
+        let now = Local::now();
+        let mut m = ClaudeMonitor::new(false);
+        m.handle_hook(&hook("UserPromptSubmit", "s", json!({})), now);
+        m.handle_hook(&hook("SubagentStart", "s", json!({"agent_id": "a1", "agent_type": "Explore"})), now);
+        m.handle_hook(&hook("SubagentStart", "s", json!({"agent_id": "a2", "agent_type": "general-purpose"})), now);
+        // a tool call inside an agent whose start was missed adds it too
+        m.handle_hook(&hook("PreToolUse", "s", json!({"agent_id": "a3", "tool_name": "Bash"})), now);
+        assert_eq!(m.agent_count(), 3);
+        // the main thread finishing its turn leaves background agents running
+        m.handle_hook(&hook("Stop", "s", json!({})), now);
+        assert_eq!(m.agent_count(), 3);
+        assert!(m.handle_hook(&hook("SubagentStop", "s", json!({"agent_id": "a1", "agent_type": "Explore"})), now));
+        assert!(!m.handle_hook(&hook("SubagentStop", "s", json!({"agent_id": "a1"})), now));
+        let s = &m.sessions()[0];
+        assert_eq!(s.agents.iter().map(|a| (a.id.as_str(), a.kind.as_str())).collect::<Vec<_>>(), [("a2", "general-purpose"), ("a3", "")]);
+        assert_eq!(m.status_json()["agents"], 2);
+        assert_eq!(m.status_json()["sessions"][0]["agents"][0]["type"], "general-purpose");
+        // a silent agent goes after 15 min; one still calling tools stays
+        let later = now + chrono::Duration::minutes(16);
+        m.handle_hook(&hook("PostToolUse", "s", json!({"agent_id": "a3"})), later - chrono::Duration::minutes(1));
+        assert!(m.expire(later));
+        assert_eq!(m.sessions()[0].agents.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(), ["a3"]);
+        m.handle_hook(&hook("SessionEnd", "s", json!({})), later);
+        assert_eq!(m.agent_count(), 0);
     }
 
     #[test]
@@ -479,9 +601,10 @@ mod tests {
                {"hooks":[{"type":"command","command":"curl -s http://127.0.0.1:9999/hook"}]}]}}"#,
         )
         .unwrap();
-        assert!(!hooks_installed_at(&path, 47800));
+        // an own hook on another port: there, but not up to date
+        assert_eq!(hooks_state_at(&path, 47800), HooksState::Outdated);
         install_hooks_at(&path, 47800).unwrap();
-        assert!(hooks_installed_at(&path, 47800));
+        assert_eq!(hooks_state_at(&path, 47800), HooksState::Installed);
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(v["model"], "opus");
         let stop = v["hooks"]["Stop"].as_array().unwrap();
@@ -490,6 +613,7 @@ mod tests {
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(v["hooks"]["Stop"].as_array().unwrap().len(), 1);
         assert!(v["hooks"].get("PreToolUse").is_none());
+        assert_eq!(hooks_state_at(&path, 47800), HooksState::Missing);
         std::fs::write(&path, "{broken").unwrap();
         assert!(install_hooks_at(&path, 47800).is_err());
         let _ = std::fs::remove_dir_all(&dir);

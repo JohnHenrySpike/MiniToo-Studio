@@ -158,7 +158,7 @@ minitoo-studio --debug              журнал в правой панели, �
 | `POST /state/<working\|alerting\|chilling>` | — | фиктивная сессия Claude в этом состоянии |
 | `POST /sound/<working\|alerting\|chilling>[/<id>]` | — | проиграть звук этого статуса (или мелодию `id`) на колонке |
 | `POST /hook` | JSON хука Claude Code | то, что вызывают установленные хуки |
-| `GET /status` | — | состояние Claude и сессии |
+| `GET /status` | — | состояние Claude, сессии и их работающие субагенты |
 | `GET /device` | — | подключение, сведения о колонке, последняя передача |
 | `GET /frame/<id\|device>` | — | PNG кадра режима или того, что сейчас на колонке |
 

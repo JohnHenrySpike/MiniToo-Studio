@@ -384,8 +384,14 @@ fn hooks_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
             let (r, _) = ui.allocate_exact_size(vec2(lw, 18.0), Sense::hover());
             let g = w::galley(ui, tr!("claude_page.hooks.hooks"), w::font(13.0), p.text);
             ui.painter().galley(pos2(r.left(), r.center().y - g.size().y / 2.0), g, p.text);
-            let t = if c.hooks_installed { tr!("claude_page.hooks.installed_in", path = c.hooks_path) } else { tr!("claude_page.hooks.not_installed").into() };
-            w::text_elided(ui, &t, w::font(13.0), p.text, None);
+            let (t, col) = if c.hooks_installed {
+                (tr!("claude_page.hooks.installed_in", path = c.hooks_path), p.text)
+            } else if c.hooks_outdated {
+                (tr!("claude_page.hooks.outdated").to_string(), p.danger)
+            } else {
+                (tr!("claude_page.hooks.not_installed").to_string(), p.text)
+            };
+            w::text_elided(ui, &t, w::font(13.0), col, None);
         });
         w::hint(
             ui,
@@ -395,7 +401,7 @@ fn hooks_group(ui: &mut Ui, cx: &mut Cx, st: &mut State) {
             if Key::new(tr!("claude_page.hooks.install")).icon("plus").accent(!c.hooks_installed).show(ui).clicked() {
                 cx.send(Command::InstallHooks);
             }
-            if Key::new(tr!("claude_page.hooks.uninstall")).icon("trash").enabled(c.hooks_installed).show(ui).clicked() {
+            if Key::new(tr!("claude_page.hooks.uninstall")).icon("trash").enabled(c.hooks_installed || c.hooks_outdated).show(ui).clicked() {
                 cx.send(Command::UninstallHooks);
             }
             if Key::new(tr!("claude_page.hooks.copy_json")).icon("copy").show(ui).clicked() {

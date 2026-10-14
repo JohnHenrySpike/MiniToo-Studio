@@ -199,7 +199,7 @@ pub struct Controller {
     listening: bool,
     port_busy: bool,
     hooks_message: Option<(bool, String)>,
-    hooks_installed: bool,
+    hooks: claude::HooksState,
 
     // image + gallery
     image: Option<ImageDoc>,
@@ -404,7 +404,7 @@ impl Controller {
             listening: false,
             port_busy: false,
             hooks_message: None,
-            hooks_installed: false,
+            hooks: claude::HooksState::Missing,
             image: None,
             fit: Fit::from_i64(settings.int("image/fitMode", 0)),
             pixel_art: false,
@@ -516,7 +516,7 @@ impl Controller {
         }
         self.start_timer(TimerKind::Battery, 1000);
         self.start_timer(TimerKind::ClaudeExpire, 10_000);
-        self.hooks_installed = claude::hooks_installed(self.port);
+        self.hooks = claude::hooks_state(self.port);
         self.load_faces();
         self.request_missing_thumbs();
         self.screen.stale = capture::stale_portal_units();
@@ -2369,7 +2369,7 @@ impl Controller {
                     self.settings.set_int("claude/port", p as i64);
                     self.listening = false;
                     self.restart_http(p);
-                    self.hooks_installed = claude::hooks_installed(p);
+                    self.hooks = claude::hooks_state(p);
                 }
             }
             Command::InstallHooks => {
@@ -2382,7 +2382,7 @@ impl Controller {
                     Ok(m) => (true, m),
                     Err(e) => (false, e),
                 });
-                self.hooks_installed = claude::hooks_installed(self.port);
+                self.hooks = claude::hooks_state(self.port);
             }
             Command::UninstallHooks => {
                 let r = claude::uninstall_hooks();
@@ -2393,7 +2393,7 @@ impl Controller {
                     Ok(m) => (true, m),
                     Err(e) => (false, e),
                 });
-                self.hooks_installed = claude::hooks_installed(self.port);
+                self.hooks = claude::hooks_state(self.port);
             }
         }
     }
@@ -2754,7 +2754,8 @@ impl Controller {
                 port: self.port,
                 listening: self.listening,
                 port_busy: self.port_busy,
-                hooks_installed: self.hooks_installed,
+                hooks_installed: self.hooks == claude::HooksState::Installed,
+                hooks_outdated: self.hooks == claude::HooksState::Outdated,
                 hooks_path: claude::claude_settings_path().to_string_lossy().into_owned(),
                 hooks_message: self.hooks_message.clone(),
                 snippet: claude::hooks_snippet(self.port),

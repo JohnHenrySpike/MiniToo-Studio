@@ -2,7 +2,7 @@
 //! the Qt version: `cargo run --example mode_frames -- <out-dir> [language] [24|12]`.
 
 use chrono::{NaiveDate, NaiveDateTime};
-use minitoo::claude::{ClaudeState, Session};
+use minitoo::claude::{Agent, ClaudeState, Session};
 use minitoo::frame::Frame;
 use minitoo::live::claudestats::{self, Limit, Limits, Totals};
 use minitoo::live::clock::{Clock, Weather};
@@ -102,20 +102,23 @@ fn main() {
 
     // claude statistics
     let now = chrono::Local::now();
-    let s = |id: &str, cwd: &str, state| Session {
+    let s = |id: &str, cwd: &str, state, agents: usize| Session {
         id: id.into(),
         cwd: cwd.into(),
         state,
         last_event: String::new(),
         message: String::new(),
         updated: now,
+        agents: (0..agents)
+            .map(|i| Agent { id: format!("{id}-{i}"), kind: "general-purpose".into(), started: now, seen: now })
+            .collect(),
     };
     let sessions = vec![
-        s("eeee5555", "/home/x/e", ClaudeState::Chilling),
-        s("dddd4444", "", ClaudeState::Chilling),
-        s("cccc3333", "/home/x/web", ClaudeState::Alerting),
-        s("bbbb2222", "/home/x/very-long-project-name-here", ClaudeState::Working),
-        s("aaaa1111", "/home/x/divoom-studio-rust", ClaudeState::Chilling),
+        s("eeee5555", "/home/x/e", ClaudeState::Chilling, 0),
+        s("dddd4444", "", ClaudeState::Chilling, 0),
+        s("cccc3333", "/home/x/web", ClaudeState::Alerting, 2),
+        s("bbbb2222", "/home/x/very-long-project-name-here", ClaudeState::Working, 8),
+        s("aaaa1111", "/home/x/divoom-studio-rust", ClaudeState::Chilling, 0),
     ];
     let totals = Totals { input: 1210, output: 4300, cache_read: 1_520_000, cache_write: 45000, replies: 2, prompts: 1 };
     let limit = |pct, mins| Some(Limit { pct, resets_at: Some(now + chrono::Duration::minutes(mins)) });

@@ -6,7 +6,7 @@
 
 use minitoo::api::*;
 use minitoo::canvas::{Align, Canvas, LineCap, r};
-use minitoo::claude::{ClaudeState, Session};
+use minitoo::claude::{Agent, ClaudeState, Session};
 use minitoo::color::Color;
 use minitoo::fonts::FontSpec;
 use minitoo::frame::Frame;
@@ -107,8 +107,11 @@ fn stats_frame(style: i64) -> Frame {
         last_event: String::new(),
         message: String::new(),
         updated: now,
+        agents: Vec::new(),
     };
-    let sessions = [session("a", "/home/x/divoom", ClaudeState::Working), session("b", "/home/x/website", ClaudeState::Alerting)];
+    let mut divoom = session("a", "/home/x/divoom", ClaudeState::Working);
+    divoom.agents = (0..3).map(|i| Agent { id: format!("a{i}"), kind: "Explore".into(), started: now, seen: now }).collect();
+    let sessions = [divoom, session("b", "/home/x/website", ClaudeState::Alerting)];
     let totals = Totals { input: 510_000, output: 1_200_000, cache_read: 60_600_000, replies: 412, prompts: 37, ..Default::default() };
     let limit = |pct, mins| Some(Limit { pct, resets_at: Some(now + chrono::Duration::minutes(mins)) });
     let limits = Limits { session: limit(38.0, 2 * 60 + 12), week: limit(56.0, 3 * 24 * 60) };
@@ -269,6 +272,7 @@ fn build() -> Snapshot {
             last_event: "Notification".into(),
             message: "Claude needs your permission to use Bash".into(),
             updated: now - chrono::Duration::seconds(12),
+            agents: Vec::new(),
         },
         Session {
             id: "f6e5d4c3b2".into(),
@@ -277,6 +281,7 @@ fn build() -> Snapshot {
             last_event: "PreToolUse".into(),
             message: String::new(),
             updated: now - chrono::Duration::seconds(140),
+            agents: Vec::new(),
         },
     ];
     let scenes = ClaudeState::ALL
@@ -367,6 +372,7 @@ fn build() -> Snapshot {
             listening: true,
             port_busy: false,
             hooks_installed: true,
+            hooks_outdated: false,
             hooks_path: "~/.claude/settings.json".into(),
             hooks_message: None,
             snippet: minitoo::claude::hooks_snippet(47800),

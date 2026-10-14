@@ -270,6 +270,8 @@ pub struct ClaudeView {
     pub listening: bool,
     pub port_busy: bool,
     pub hooks_installed: bool,
+    /// some of our hooks are there, but not all events or another port: reinstall
+    pub hooks_outdated: bool,
     pub hooks_path: String,
     pub hooks_message: Option<(bool, String)>,
     pub snippet: String,

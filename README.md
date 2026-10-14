@@ -159,7 +159,7 @@ The app listens on `127.0.0.1:47800` (local only; the port is configurable).
 | `POST /state/<working\|alerting\|chilling>` | — | fake a Claude session in that state |
 | `POST /sound/<working\|alerting\|chilling>[/<id>]` | — | play that status sound (or sound `id`) on the speaker |
 | `POST /hook` | Claude Code hook JSON | what the installed hooks call |
-| `GET /status` | — | Claude state and sessions |
+| `GET /status` | — | Claude state, sessions and their running subagents |
 | `GET /device` | — | connection, speaker info, last transfer |
 | `GET /frame/<id\|device>` | — | PNG of a mode's frame, or of what the speaker shows |
 
