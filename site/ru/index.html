@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniToo Studio — всё на экране колонки Divoom MiniToo</title>
+<meta name="description" content="Приложение для колонки Divoom MiniToo: картинки и GIF, трансляция экрана, часы и панели, уведомления и статус сессий Claude Code — напрямую по Bluetooth, без телефона.">
+<meta property="og:title" content="MiniToo Studio">
+<meta property="og:description" content="Всё на экране колонки Divoom MiniToo.">
+<meta property="og:image" content="../images/ru/modes.png">
+<link rel="alternate" hreflang="en" href="../">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="./"><img src="../favicon.svg" alt="">MiniToo<small>STUDIO</small></a>
+    <nav class="nav">
+      <a href="#features">Возможности</a>
+      <a href="#screenshots">Скриншоты</a>
+      <a href="#claude">Claude Code</a>
+      <a href="#install">Установка</a>
+      <a href="https://github.com/JohnHenrySpike/MiniToo-Studio">GitHub</a>
+    </nav>
+    <div class="lang"><a href="../" hreflang="en">EN</a><span>RU</span></div>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <h1>Маленький ретро-экран —<br>ваш <b>настольный компаньон</b></h1>
+    <p class="lead">Картинки и GIF, трансляция рабочего стола, часы и панели, уведомления и статус ваших сессий
+      Claude Code — на экране 160×128 колонки Divoom MiniToo, напрямую по Bluetooth.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/JohnHenrySpike/MiniToo-Studio/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+        Скачать для Linux</a>
+      <a class="btn" href="https://github.com/JohnHenrySpike/MiniToo-Studio">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.7 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        Исходники на GitHub</a>
+    </div>
+    <div class="badges"><span>Linux · KDE Wayland</span><span>Rust · egui</span><span>Без телефона и приложения Divoom</span><span>English · Русский</span></div>
+    <img class="shot" src="../images/ru/modes.png" width="1180" height="760" alt="MiniToo Studio: страница «Режимы», на колонке часы">
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Один экранчик — много дел</h2>
+    <p class="sub">MiniToo Studio общается с колонкой напрямую по Bluetooth RFCOMM и не даёт её экрану скучать:
+      всё предсказуемое отправляется на минуту вперёд, и колонка проигрывает это сама.</p>
+    <div class="grid">
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>
+        <h3>Картинки и GIF</h3>
+        <p>PNG, JPEG, GIF, WebP, APNG, SVG, JPEG XL и не только. Рамка кадрирования 5:4, режим пиксель-арта и локальная галерея с избранным.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m10 8 4 2.5-4 2.5V8Z"/></svg>
+        <h3>Трансляция экрана</h3>
+        <p>Выберите монитор или окно через портал рабочего стола и транслируйте его область до 20 кадров/с.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <h3>Живые режимы</h3>
+        <p>Часы и погода, системный монитор, «Сейчас играет», Pomodoro, статистика Claude Code, GitHub Actions и визуализатор звука — по одному или ротацией.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M9 11v2M15 11v2M2 12h2M20 12h2"/></svg>
+        <h3>Статус Claude Code</h3>
+        <p>Работает, отдыхает или ждёт вас — с именем проекта и вопросом. 18 пиксельных анимаций и короткая мелодия при каждой смене.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <h3>Уведомления</h3>
+        <p>Уведомления рабочего стола — карточками со значком отправителя поверх того, что на экране.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <h3>Блокировка экрана</h3>
+        <p>Когда компьютер заблокирован, колонка показывает часы и приглушает яркость; после разблокировки всё возвращается как было.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+        <h3>Управление колонкой</h3>
+        <p>Яркость, громкость, воспроизведение, включение экрана, синхронизация часов, заряд батареи, встроенные экраны и игры.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-5-6-5M12 19h8"/></svg>
+        <h3>Автоматизация</h3>
+        <p>Локальный HTTP API и командная строка: отправить картинку из скрипта, переключить режим, показать карточку об окончании сборки.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <h3>Русский и английский</h3>
+        <p>24/12-часовой формат времени и форматы даты; переводы — обычные текстовые файлы, можно добавить свой язык.</p>
+      </div>
+    </div>
+    <figure class="wide">
+      <img class="shot" src="../images/ru/live-modes.png" width="1344" height="544" alt="Живые режимы на экране 160×128" loading="lazy">
+      <figcaption>Живые режимы так, как их показывает колонка (увеличено ×2)</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="screenshots" class="alt">
+  <div class="wrap">
+    <h2>Скриншоты</h2>
+    <p class="sub">Интерфейс похож на саму колонку: пластиковые панели, клавиши с ходом, пиксельный текст — в бежевой и ночной темах.</p>
+    <div class="gallery" data-base="../images/ru/">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-shot="claude" data-caption="<b>Claude</b> — статус Claude Code и сцены">Claude</button>
+        <button role="tab" aria-selected="false" data-shot="image" data-caption="<b>Изображение</b> — картинки, рамка кадрирования и галерея">Изображение</button>
+        <button role="tab" aria-selected="false" data-shot="speaker" data-caption="<b>Колонка</b> — батарея, звук, блокировка, встроенные экраны">Колонка</button>
+        <button role="tab" aria-selected="false" data-shot="modes-dark" data-caption="<b>Ночная тема</b> — страница «Режимы» вечером">Ночная тема</button>
+      </div>
+      <figure>
+        <img class="shot" src="../images/ru/claude.png" width="1180" height="760" alt="Claude" loading="lazy">
+        <figcaption><b>Claude</b> — статус Claude Code и сцены</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="claude">
+  <div class="wrap split">
+    <div>
+      <h2>Claude Code на вашем столе</h2>
+      <p class="sub">Одна кнопка ставит хуки в <code>~/.claude/settings.json</code> (с резервной копией и не трогая
+        ваши остальные хуки). С этого момента колонка показывает, чем занят Claude, — и зовёт, когда нужны вы,
+        с именем проекта и вопросом: «Разрешить Bash?».</p>
+      <div class="screens">
+        <figure><img class="lcd" src="../images/scenes/working-hammer.gif" width="320" height="256" alt="Работает: Кузнец" loading="lazy"><figcaption>работает</figcaption></figure>
+        <figure><img class="lcd" src="../images/scenes/alerting-bell.gif" width="320" height="256" alt="Ждёт вас: Колокол" loading="lazy"><figcaption>ждёт вас</figcaption></figure>
+        <figure><img class="lcd" src="../images/scenes/chilling-fishing.gif" width="320" height="256" alt="Отдыхает: Рыбалка" loading="lazy"><figcaption>отдыхает</figcaption></figure>
+      </div>
+    </div>
+    <div>
+      <div class="note">
+        <p><b>18 сцен</b>, нарисованных попиксельно на сетке 40×32, по шесть на каждое состояние — или свой GIF.
+          Работающие субагенты тоже видны.</p>
+      </div>
+      <div class="note">
+        <p><b>8-битные мелодии</b> из самой колонки (если она подключена как аудио), на выбор из четырёх для каждого состояния.</p>
+      </div>
+      <div class="note">
+        <p><b>Статистика</b>: токены, сессии и лимиты подписки как живой режим, в шести видах.</p>
+      </div>
+      <div class="note">
+        <p>Тревога может прерывать картинки и трансляцию, так что вопрос не останется незамеченным.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="alt">
+  <div class="wrap">
+    <h2>Установка</h2>
+    <p class="sub">Понадобятся Divoom MiniToo и Bluetooth-адаптер. Сопряжение не нужно: при первом запуске откройте
+      <b>Настройки</b>, введите MAC-адрес колонки или нажмите <b>Найти</b>.</p>
+    <div class="steps">
+      <div class="card">
+        <h3>Из релиза</h3>
+        <p>Скачайте <code>minitoo-studio-vX.Y.Z-linux-x86_64.tar.gz</code> со страницы
+          <a href="https://github.com/JohnHenrySpike/MiniToo-Studio/releases/latest">Releases</a>, затем:</p>
+        <div class="code"><pre>tar xzf minitoo-studio-*-linux-x86_64.tar.gz
+cd minitoo-studio-*-linux-x86_64
+./minitoo-studio</pre></div>
+      </div>
+      <div class="card">
+        <h3>…или из исходников</h3>
+        <p>В контейнере, когда на хосте есть только Docker, — или локальным тулчейном (Rust 1.88+, заголовки PipeWire, clang, pkg-config):</p>
+        <div class="code"><pre>./build.sh                 # → build/minitoo-studio
+cargo build --release      # или без Docker</pre></div>
+      </div>
+      <div class="card">
+        <h3>Меню приложений и автозапуск</h3>
+        <p>Добавляет MiniToo Studio в меню приложений, а с <code>--autostart</code> — запускает его в трее при входе.
+          Закрытое окно оставляет приложение работать в трее.</p>
+        <div class="code"><pre>./packaging/install-desktop.sh --autostart   # --uninstall — убрать</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="api">
+  <div class="wrap split">
+    <div>
+      <h2>Автоматизация</h2>
+      <p class="sub">Приложение слушает <code>127.0.0.1:47800</code>, только локально. То же самое доступно из командной строки.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Запрос</th><th>Что делает</th></tr></thead>
+          <tbody>
+            <tr><td><code>POST /show</code></td><td>открыть файл и отправить</td></tr>
+            <tr><td><code>POST /notify</code></td><td>показать карточку уведомления</td></tr>
+            <tr><td><code>POST /live/&lt;id&gt;</code></td><td>показать живой режим</td></tr>
+            <tr><td><code>POST /mode/&lt;claude|idle&gt;</code></td><td>отдать экран Claude или освободить его</td></tr>
+            <tr><td><code>GET /status</code></td><td>состояние Claude, сессии и субагенты</td></tr>
+            <tr><td><code>GET /frame/device</code></td><td>PNG того, что сейчас на колонке</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="note">
+        <p>Карточка, когда сборка закончилась:</p>
+        <div class="code"><pre>curl -X POST -d '{"app":"build","summary":"Сборка готова","body":"0 ошибок"}' \
+     http://127.0.0.1:47800/notify</pre></div>
+      </div>
+      <div class="note">
+        <p>Картинка из скрипта — через запущенное приложение:</p>
+        <div class="code"><pre>minitoo-studio --send cat.gif --fit crop</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="platforms" class="alt">
+  <div class="wrap">
+    <h2>Платформы</h2>
+    <p class="sub">Основная платформа — Linux с KDE Plasma на Wayland, проверена на настоящей колонке. Сборка под Windows
+      проходит проверку типов, но на устройстве ещё не запускалась; macOS не проверялся.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th></th><th>Linux (KDE / Wayland)</th><th>Windows</th><th>macOS</th></tr></thead>
+        <tbody>
+          <tr><td>Связь с колонкой</td><td>RFCOMM-сокет по MAC или <code>/dev/rfcommN</code></td><td>RFCOMM-сокет по MAC или COM-порт</td><td>последовательный порт сопряжённой колонки</td></tr>
+          <tr><td>Картинки, галерея, живые режимы, Claude, HTTP, CLI</td><td>✅</td><td>✅</td><td>✅</td></tr>
+          <tr><td>Трансляция экрана</td><td>портал + PipeWire</td><td>xcap</td><td>xcap</td></tr>
+          <tr><td>Визуализатор звука</td><td>PipeWire</td><td>cpal (loopback)</td><td>cpal (вход)</td></tr>
+          <tr><td>Сейчас играет, уведомления, блокировка, батарея</td><td>D-Bus</td><td>—</td><td>—</td></tr>
+          <tr><td>Трей</td><td>StatusNotifierItem</td><td>tray-icon</td><td>tray-icon</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>MiniToo Studio · <a href="https://github.com/JohnHenrySpike/MiniToo-Studio">GitHub</a> ·
+      <a href="https://github.com/JohnHenrySpike/MiniToo-Studio/releases">Релизы</a> ·
+      <a href="https://github.com/JohnHenrySpike/MiniToo-Studio/issues">Задачи</a></div>
+    <div>MIT © John Henry Spike. Независимый проект, не связан с Divoom и Anthropic.</div>
+  </div>
+</footer>
+
+<script src="../script.js"></script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniToo Studio — everything on the screen of a Divoom MiniToo</title>
+<meta name="description" content="A desktop app for the Divoom MiniToo speaker: pictures and GIFs, screen mirroring, clocks and dashboards, desktop notifications and the status of your Claude Code sessions — straight over Bluetooth, no phone needed.">
+<meta property="og:title" content="MiniToo Studio">
+<meta property="og:description" content="Everything on the screen of a Divoom MiniToo speaker.">
+<meta property="og:image" content="images/en/modes.png">
+<link rel="alternate" hreflang="ru" href="ru/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="./"><img src="favicon.svg" alt="">MiniToo<small>STUDIO</small></a>
+    <nav class="nav">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#claude">Claude Code</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/JohnHenrySpike/MiniToo-Studio">GitHub</a>
+    </nav>
+    <div class="lang"><span>EN</span><a href="ru/" hreflang="ru">RU</a></div>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <h1>A tiny retro screen,<br>now your <b>desk companion</b></h1>
+    <p class="lead">Pictures and GIFs, a live mirror of your desktop, clocks and dashboards, desktop notifications and
+      the status of your Claude Code sessions — on the 160×128 screen of a Divoom MiniToo, straight over Bluetooth.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/JohnHenrySpike/MiniToo-Studio/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+        Download for Linux</a>
+      <a class="btn" href="https://github.com/JohnHenrySpike/MiniToo-Studio">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.7 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        Source on GitHub</a>
+    </div>
+    <div class="badges"><span>Linux · KDE Wayland</span><span>Rust · egui</span><span>No phone, no Divoom app</span><span>English · Русский</span></div>
+    <img class="shot" src="images/en/modes.png" width="1180" height="760" alt="MiniToo Studio: the Modes page with the clock on the speaker">
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>One little screen, many jobs</h2>
+    <p class="sub">MiniToo Studio talks to the speaker directly over Bluetooth RFCOMM and keeps its screen busy:
+      anything predictable is sent a minute ahead, so the speaker plays it on its own.</p>
+    <div class="grid">
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>
+        <h3>Pictures and GIFs</h3>
+        <p>PNG, JPEG, GIF, WebP, APNG, SVG, JPEG XL and more. A draggable 5:4 crop frame, pixel-art scaling and a local gallery with favourites.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m10 8 4 2.5-4 2.5V8Z"/></svg>
+        <h3>Screen mirroring</h3>
+        <p>Pick a monitor or a window through the desktop portal and stream an area of it at up to 20 fps.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <h3>Live modes</h3>
+        <p>Clock and weather, system monitor, now playing, Pomodoro, Claude Code statistics, GitHub Actions and an audio visualizer — alone or in a rotation.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M9 11v2M15 11v2M2 12h2M20 12h2"/></svg>
+        <h3>Claude Code status</h3>
+        <p>Working, resting or waiting for you — with the project name and the question. 18 pixel animations and a short tune for every change.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <h3>Notifications</h3>
+        <p>Desktop notifications appear as cards with the sender's icon, on top of whatever is showing.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <h3>Screen lock</h3>
+        <p>When the computer locks, the speaker shows a clock and dims; after unlocking everything comes back as it was.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+        <h3>Speaker control</h3>
+        <p>Brightness, volume, playback, screen on/off, clock sync, battery level and the speaker's built-in screens and games.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-5-6-5M12 19h8"/></svg>
+        <h3>Scriptable</h3>
+        <p>A local HTTP API and a command line: send a picture from a script, switch modes, push a card from your build.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <h3>English and Russian</h3>
+        <p>24/12-hour time and date formats; translations are plain text files you can add yourself.</p>
+      </div>
+    </div>
+    <figure class="wide">
+      <img class="shot" src="images/en/live-modes.png" width="1344" height="544" alt="Live modes on the 160×128 screen" loading="lazy">
+      <figcaption>Live modes as the speaker shows them (enlarged ×2)</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="screenshots" class="alt">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <p class="sub">The interface looks like the speaker itself: plastic panels, keys with travel, pixel text — in a beige and a night theme.</p>
+    <div class="gallery" data-base="images/en/">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-shot="claude" data-caption="<b>Claude</b> — Claude Code status and scenes">Claude</button>
+        <button role="tab" aria-selected="false" data-shot="image" data-caption="<b>Image</b> — pictures, crop frame and gallery">Image</button>
+        <button role="tab" aria-selected="false" data-shot="speaker" data-caption="<b>Speaker</b> — battery, sound, lock screen, built-in screens">Speaker</button>
+        <button role="tab" aria-selected="false" data-shot="modes-dark" data-caption="<b>Night theme</b> — the Modes page after dark">Night theme</button>
+      </div>
+      <figure>
+        <img class="shot" src="images/en/claude.png" width="1180" height="760" alt="Claude" loading="lazy">
+        <figcaption><b>Claude</b> — Claude Code status and scenes</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="claude">
+  <div class="wrap split">
+    <div>
+      <h2>Claude Code on your desk</h2>
+      <p class="sub">One click installs hooks into <code>~/.claude/settings.json</code> (with a backup, leaving your other
+        hooks alone). From then on the speaker shows what Claude is doing — and rings when it needs you,
+        with the project name and the question: “Allow Bash?”.</p>
+      <div class="screens">
+        <figure><img class="lcd" src="images/scenes/working-hammer.gif" width="320" height="256" alt="Working: Blacksmith" loading="lazy"><figcaption>working</figcaption></figure>
+        <figure><img class="lcd" src="images/scenes/alerting-bell.gif" width="320" height="256" alt="Needs you: Bell" loading="lazy"><figcaption>needs you</figcaption></figure>
+        <figure><img class="lcd" src="images/scenes/chilling-fishing.gif" width="320" height="256" alt="Resting: Fishing" loading="lazy"><figcaption>resting</figcaption></figure>
+      </div>
+    </div>
+    <div>
+      <div class="note">
+        <p><b>18 scenes</b>, drawn pixel by pixel on a 40×32 grid, six for each state — or your own GIF.
+          Running subagents show up too.</p>
+      </div>
+      <div class="note">
+        <p><b>8-bit tunes</b> from the speaker itself (when it is connected as audio), four to choose from per state.</p>
+      </div>
+      <div class="note">
+        <p><b>Usage statistics</b>: tokens, sessions and plan limits as a live mode, in six looks.</p>
+      </div>
+      <div class="note">
+        <p>Alerts can break through pictures and streams, so a question never waits unnoticed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="alt">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="sub">You need a Divoom MiniToo and a Bluetooth adapter. Pairing is not required: on the first start open
+      <b>Settings</b>, put in the speaker's MAC address or press <b>Find</b>.</p>
+    <div class="steps">
+      <div class="card">
+        <h3>From a release</h3>
+        <p>Download <code>minitoo-studio-vX.Y.Z-linux-x86_64.tar.gz</code> from
+          <a href="https://github.com/JohnHenrySpike/MiniToo-Studio/releases/latest">Releases</a>, then:</p>
+        <div class="code"><pre>tar xzf minitoo-studio-*-linux-x86_64.tar.gz
+cd minitoo-studio-*-linux-x86_64
+./minitoo-studio</pre></div>
+      </div>
+      <div class="card">
+        <h3>…or from source</h3>
+        <p>In a container, with only Docker on the host — or with a local toolchain (Rust 1.88+, PipeWire headers, clang, pkg-config):</p>
+        <div class="code"><pre>./build.sh                 # → build/minitoo-studio
+cargo build --release      # or without Docker</pre></div>
+      </div>
+      <div class="card">
+        <h3>App menu and autostart</h3>
+        <p>Adds MiniToo Studio to the application menu and, with <code>--autostart</code>, starts it hidden in the tray on login.
+          Closing the window keeps the app running in the tray.</p>
+        <div class="code"><pre>./packaging/install-desktop.sh --autostart   # --uninstall to undo</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="api">
+  <div class="wrap split">
+    <div>
+      <h2>Scriptable</h2>
+      <p class="sub">The app listens on <code>127.0.0.1:47800</code>, local only. The same things work from the command line.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Request</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>POST /show</code></td><td>open a file and send it</td></tr>
+            <tr><td><code>POST /notify</code></td><td>show a notification card</td></tr>
+            <tr><td><code>POST /live/&lt;id&gt;</code></td><td>show a live mode</td></tr>
+            <tr><td><code>POST /mode/&lt;claude|idle&gt;</code></td><td>give the screen to Claude, or release it</td></tr>
+            <tr><td><code>GET /status</code></td><td>Claude state, sessions and subagents</td></tr>
+            <tr><td><code>GET /frame/device</code></td><td>PNG of what the speaker shows</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="note">
+        <p>A card when your build finishes:</p>
+        <div class="code"><pre>curl -X POST -d '{"app":"build","summary":"Build finished","body":"0 errors"}' \
+     http://127.0.0.1:47800/notify</pre></div>
+      </div>
+      <div class="note">
+        <p>A picture from a script, through the running app:</p>
+        <div class="code"><pre>minitoo-studio --send cat.gif --fit crop</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="platforms" class="alt">
+  <div class="wrap">
+    <h2>Platforms</h2>
+    <p class="sub">Linux with KDE Plasma on Wayland is the main target and is tested on a real speaker. The Windows build is
+      type-checked but not tried on a device yet; macOS is untested.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th></th><th>Linux (KDE / Wayland)</th><th>Windows</th><th>macOS</th></tr></thead>
+        <tbody>
+          <tr><td>Speaker link</td><td>RFCOMM socket by MAC or <code>/dev/rfcommN</code></td><td>RFCOMM socket by MAC or COM port</td><td>serial port of the paired speaker</td></tr>
+          <tr><td>Pictures, gallery, live modes, Claude, HTTP, CLI</td><td>✅</td><td>✅</td><td>✅</td></tr>
+          <tr><td>Screen mirroring</td><td>portal + PipeWire</td><td>xcap</td><td>xcap</td></tr>
+          <tr><td>Audio visualizer</td><td>PipeWire</td><td>cpal (loopback)</td><td>cpal (input)</td></tr>
+          <tr><td>Now playing, notifications, lock screen, battery</td><td>D-Bus</td><td>—</td><td>—</td></tr>
+          <tr><td>Tray</td><td>StatusNotifierItem</td><td>tray-icon</td><td>tray-icon</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>MiniToo Studio · <a href="https://github.com/JohnHenrySpike/MiniToo-Studio">GitHub</a> ·
+      <a href="https://github.com/JohnHenrySpike/MiniToo-Studio/releases">Releases</a> ·
+      <a href="https://github.com/JohnHenrySpike/MiniToo-Studio/issues">Issues</a></div>
+    <div>MIT © John Henry Spike. Not affiliated with Divoom or Anthropic.</div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

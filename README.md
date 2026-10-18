@@ -6,11 +6,12 @@
 your desktop, clocks and dashboards, desktop notifications and the status of your Claude Code
 sessions.
 
-**English** · [Русский](README.ru.md)
+**English** · [Русский](README.ru.md) · [Website](https://johnhenryspike.github.io/MiniToo-Studio/)
 
 [![Rust](https://img.shields.io/badge/Rust-2024-dea584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![egui](https://img.shields.io/badge/UI-egui-d97757)](https://github.com/emilk/egui)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%C2%B7%20KDE%20Wayland-1d99f3?logo=linux&logoColor=white)](#platforms)
+[![Release](https://img.shields.io/github/v/release/JohnHenrySpike/MiniToo-Studio?label=release)](https://github.com/JohnHenrySpike/MiniToo-Studio/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-4c8a3f)](LICENSE)
 
 <img src="docs/images/en/modes.png" alt="MiniToo Studio: the Modes page with the clock on the speaker" width="880">
@@ -88,6 +89,17 @@ RFCOMM — no phone and no Divoom app — and turns that little screen into a de
 - A **Divoom MiniToo** and a Bluetooth adapter. Pairing is not required: the app connects to
   RFCOMM channel 1 by MAC address. **Settings → Speaker → Find** scans for it.
 - **Linux** with KDE Plasma on Wayland is the main target; see [Platforms](#platforms) for the rest.
+
+### Download
+
+Download `minitoo-studio-vX.Y.Z-linux-x86_64.tar.gz` from the
+[Releases](https://github.com/JohnHenrySpike/MiniToo-Studio/releases) page, then:
+
+```bash
+tar xzf minitoo-studio-*-linux-x86_64.tar.gz
+cd minitoo-studio-*-linux-x86_64
+./minitoo-studio
+```
 
 ### Build
 

@@ -5,11 +5,12 @@
 **Всё на экране колонки Divoom MiniToo** — картинки и GIF, трансляция рабочего стола, часы и
 панели, уведомления и статус ваших сессий Claude Code.
 
-[English](README.md) · **Русский**
+[English](README.md) · **Русский** · [Сайт](https://johnhenryspike.github.io/MiniToo-Studio/ru/)
 
 [![Rust](https://img.shields.io/badge/Rust-2024-dea584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![egui](https://img.shields.io/badge/UI-egui-d97757)](https://github.com/emilk/egui)
 [![Платформа](https://img.shields.io/badge/платформа-Linux%20%C2%B7%20KDE%20Wayland-1d99f3?logo=linux&logoColor=white)](#платформы)
+[![Release](https://img.shields.io/github/v/release/JohnHenrySpike/MiniToo-Studio?label=release)](https://github.com/JohnHenrySpike/MiniToo-Studio/releases/latest)
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8a3f)](LICENSE)
 
 <img src="docs/images/ru/modes.png" alt="MiniToo Studio: страница «Режимы», на колонке часы" width="880">
@@ -88,6 +89,17 @@ RFCOMM — без телефона и приложения Divoom — и пре�
   RFCOMM-каналу 1 по MAC-адресу. Кнопка **Настройки → Колонка → Найти** ищет колонку.
 - **Linux** с KDE Plasma на Wayland — основная платформа; про остальные — в разделе
   [Платформы](#платформы).
+
+### Скачать
+
+Скачайте `minitoo-studio-vX.Y.Z-linux-x86_64.tar.gz` со страницы
+[Releases](https://github.com/JohnHenrySpike/MiniToo-Studio/releases) и выполните:
+
+```bash
+tar xzf minitoo-studio-*-linux-x86_64.tar.gz
+cd minitoo-studio-*-linux-x86_64
+./minitoo-studio
+```
 
 ### Сборка
 
