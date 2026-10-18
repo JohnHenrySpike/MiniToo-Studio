@@ -1,0 +1,91 @@
+# Tests on every push to main and dev (and on pull requests into main).
+# main: keeps a draft release up to date — the version from Cargo.toml, commits since the last release.
+# dev: always builds the app and keeps it as a workflow artifact.
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build dependencies (PipeWire headers, clang for bindgen)
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libpipewire-0.3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked --lib
+
+  draft-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency: draft-release
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Create or update the draft release
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
+          tag="v$version"
+
+          if gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null | grep -qx false; then
+            echo "::warning::$tag is already released; bump the version in Cargo.toml for the next draft"
+            exit 0
+          fi
+
+          prev=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          if [ -n "$prev" ]; then
+            range="$prev..HEAD"
+            echo "Changes since $prev:" > notes.md
+          else
+            range=HEAD
+            echo "Changes:" > notes.md
+          fi
+          echo >> notes.md
+          git log --no-merges --pretty='- %s' "$range" >> notes.md
+
+          draft=$(gh release list --limit 100 --json tagName,isDraft \
+            --jq 'map(select(.isDraft)) | first | .tagName // empty')
+          if [ -n "$draft" ]; then
+            gh release edit "$draft" --tag "$tag" --title "$tag" \
+              --target "$GITHUB_SHA" --notes-file notes.md
+          else
+            gh release create "$tag" --draft --title "$tag" \
+              --target "$GITHUB_SHA" --notes-file notes.md
+          fi
+
+  build-dev:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build dependencies (PipeWire headers, clang for bindgen)
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libpipewire-0.3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - id: dist
+        run: |
+          name="minitoo-studio-dev-${GITHUB_SHA::7}-linux-x86_64"
+          tools/dist.sh "$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.dist.outputs.name }}
+          path: dist/${{ steps.dist.outputs.name }}.tar.gz*
+          if-no-files-found: error

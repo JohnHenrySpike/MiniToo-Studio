@@ -4,8 +4,11 @@
 #   ~/.local/share/icons/hicolor/scalable/apps/minitoo-studio.svg
 # Also lets the xdg-desktop-portal recognise the app id (screen capture dialog).
 # Pass --autostart to start it hidden in the tray on login. Undo with --uninstall.
+# Works from the source tree (build/minitoo-studio) and from an unpacked release (./minitoo-studio).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
+bin="$root/build/minitoo-studio"
+[ -x "$bin" ] || bin="$root/minitoo-studio"
 apps="$HOME/.local/share/applications"
 icons="$HOME/.local/share/icons/hicolor/scalable/apps"
 autostart="$HOME/.config/autostart"
@@ -25,14 +28,14 @@ Name=MiniToo Studio
 GenericName=Divoom MiniToo
 Comment=Pictures, screen mirroring and Claude Code status on a Divoom MiniToo
 Comment[ru]=Изображения, трансляция экрана и статус Claude Code на Divoom MiniToo
-Exec=$root/build/minitoo-studio
+Exec=$bin
 Icon=minitoo-studio
 Categories=Utility;
 StartupWMClass=minitoo-studio
 DESKTOP
 if [ "${1:-}" = "--autostart" ]; then
     mkdir -p "$autostart"
-    sed "s|^Exec=.*|Exec=$root/build/minitoo-studio --hidden|" "$apps/minitoo-studio.desktop" > "$autostart/minitoo-studio.desktop"
+    sed "s|^Exec=.*|Exec=$bin --hidden|" "$apps/minitoo-studio.desktop" > "$autostart/minitoo-studio.desktop"
 fi
 command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null || true
 echo "installed: $apps/minitoo-studio.desktop"

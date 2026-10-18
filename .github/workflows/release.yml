@@ -1,0 +1,30 @@
+# When a release is published (e.g. the draft from ci.yml, on the Releases page),
+# builds the app from its tag and attaches the archive to the release.
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  assets:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Build dependencies (PipeWire headers, clang for bindgen)
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev pkg-config libpipewire-0.3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: tools/dist.sh "minitoo-studio-$TAG-linux-x86_64"
+      - run: gh release upload "$TAG" dist/minitoo-studio-"$TAG"-linux-x86_64.tar.gz* --clobber
