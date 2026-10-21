@@ -456,49 +456,68 @@ fn agent_badge_right(c: &mut Canvas, right: f32, cy: f32, n: usize, on_accent: b
     agent_badge(c, right - badge_width(n), cy, n, on_accent);
 }
 
-/// Sessions as dots from `right_x` leftwards (at most `max`). Returns the left edge drawn.
-fn session_dots(c: &mut Canvas, right_x: f32, cy: f32, sessions: &[Session], max: usize, ring: Option<Color>) -> f32 {
-    let mut x = right_x;
-    for s in sessions.iter().take(max) {
-        if let Some(o) = ring {
-            c.fill_circle(x, cy, 4.0, o);
-        }
-        c.fill_circle(x, cy, 3.0, state_color(s.state));
-        x -= 9.0;
-    }
-    x + 9.0 - 4.0
+const URGENCY: [ClaudeState; 3] = [ClaudeState::Alerting, ClaudeState::Working, ClaudeState::Chilling];
+
+fn count_in(sessions: &[Session], st: ClaudeState) -> usize {
+    sessions.iter().filter(|s| s.state == st).count()
 }
 
 /// Sessions ending at `right`, the most urgent first: up to five dots, above that a dot and a
 /// count per state («● 1 ● 4 ● 10»), so the width stays put however many there are.
-/// Returns the left edge drawn.
-fn session_marks(c: &mut Canvas, right: f32, cy: f32, sessions: &[Session]) -> f32 {
-    const ORDER: [ClaudeState; 3] = [ClaudeState::Alerting, ClaudeState::Working, ClaudeState::Chilling];
-    let count = |st: ClaudeState| sessions.iter().filter(|s| s.state == st).count();
+/// `on_accent`: dots ringed and counts dark, for the accent header. Returns the left edge drawn.
+fn session_marks(c: &mut Canvas, right: f32, cy: f32, sessions: &[Session], on_accent: bool) -> f32 {
+    let rad = if on_accent { 4.0 } else { 3.0 };
+    let dot = |c: &mut Canvas, x: f32, st: ClaudeState| {
+        if on_accent {
+            c.fill_circle(x, cy, 4.0, HEAD);
+        }
+        c.fill_circle(x, cy, 3.0, state_color(st));
+    };
     if sessions.len() <= 5 {
-        let mut x = right - 3.0;
-        for st in ORDER.iter().rev() {
-            for _ in 0..count(*st) {
-                c.fill_circle(x, cy, 3.0, state_color(*st));
+        let mut x = right - rad;
+        for st in URGENCY.iter().rev() {
+            for _ in 0..count_in(sessions, *st) {
+                dot(c, x, *st);
                 x -= 9.0;
             }
         }
-        return x + 9.0 - 3.0;
+        return x + 9.0 - rad;
     }
     let f = FontSpec::bold(9.0);
     let mut x = right;
-    for st in ORDER.iter().rev() {
-        let n = count(*st);
+    for st in URGENCY.iter().rev() {
+        let n = count_in(sessions, *st);
         if n == 0 {
             continue;
         }
         let t = n.to_string();
         let w = Canvas::text_width(&t, f);
-        c.text(r(x - w, cy - 7.0, w + 2.0, 14.0), Align::LEFT, &t, f, state_color(*st));
-        c.fill_circle(x - w - 5.0, cy, 3.0, state_color(*st));
-        x -= w + 15.0;
+        c.text(r(x - w, cy - 7.0, w + 2.0, 14.0), Align::LEFT, &t, f, if on_accent { HEAD } else { state_color(*st) });
+        dot(c, x - w - 2.0 - rad, *st);
+        x -= w + 2.0 + 2.0 * rad + 7.0;
     }
     x + 7.0
+}
+
+/// [`session_marks`] in the pixel style: 5×5 squares, or a square and a count per state,
+/// ending at `right` with the top at `y`.
+fn pixel_marks(c: &mut Canvas, right: i32, y: i32, sessions: &[Session]) {
+    let mut x = right;
+    for st in URGENCY.iter().rev() {
+        let n = count_in(sessions, *st);
+        if sessions.len() <= 5 {
+            for _ in 0..n {
+                c.fill_rect((x - 5) as f32, (y + 2) as f32, 5.0, 5.0, state_color(*st));
+                x -= 8;
+            }
+        } else if n > 0 {
+            let t = n.to_string();
+            let w = crate::pixelfont::width(&t, 1);
+            c.pixel_text(x - w, y, &t, state_color(*st), 1, 1);
+            c.fill_rect((x - w - 7) as f32, (y + 2) as f32, 5.0, 5.0, state_color(*st));
+            x -= w + 7 + 5;
+        }
+    }
 }
 
 /// Session rows: dot, project, optionally the state on the right.
@@ -575,29 +594,35 @@ fn ring(c: &mut Canvas, cx: f32, cy: f32, g: Option<&Gauge>, label: &str) {
         c.arc(cx, cy, rad, 225.0, -270.0 * (g.pct / 100.0).clamp(0.0, 1.0), 6.0, severity(g), LineCap::Round);
         if let Some(p) = g.pace {
             let a = (225.0 - 270.0 * p).to_radians();
-            let (o, i) = (rad + 5.0, rad - 5.0);
+            // across the band only, clear of the number inside
+            let (o, i) = (rad + 5.0, rad - 3.0);
             c.line(cx + i * a.cos(), cy - i * a.sin(), cx + o * a.cos(), cy - o * a.sin(), 1.5, Color::WHITE);
         }
     }
-    c.text(r(cx - 22.0, cy - 9.0, 44.0, 18.0), Align::CENTER, &pct_text(g), FontSpec::bold(12.0), Color::WHITE);
+    // «100%» at 12 px is wider than the hole of the ring
+    let p = pct_text(g);
+    let f = [12.0, 11.0, 10.0, 9.0].map(FontSpec::bold).into_iter().find(|f| Canvas::text_width(&p, *f) <= 24.0).unwrap_or(FontSpec::bold(9.0));
+    c.text(r(cx - 22.0, cy - 9.0, 44.0, 18.0), Align::CENTER, &p, f, Color::WHITE);
     c.text(r(cx - 30.0, cy + 20.0, 60.0, 12.0), Align::CENTER, label, FontSpec::sans(9.0), DIM);
     c.text(r(cx - 39.0, cy + 32.0, 78.0, 12.0), Align::CENTER, reset_text(g), FontSpec::bold(9.0), Color::rgb(210, 205, 220));
 }
 
-/// «Кольца»: two ring gauges, sessions as dots in the header.
+/// «Кольца»: two ring gauges, sessions in the header, the agents by today's tokens.
 fn draw_rings(c: &mut Canvas, v: &View) {
     c.fill(BG);
-    header(c, 18.0, "", 0);
-    // the badge and the dots share the room right of the title
-    let title_end = 6.0 + Canvas::text_width("Claude Code", FontSpec::bold(11.0)) + 4.0;
-    let bw = badge_width(v.agents);
-    let room = 156.0 - title_end - if bw > 0.0 { bw + 4.0 } else { 0.0 };
-    let left = session_dots(c, 152.0, 9.0, v.sessions, ((room / 9.0) as usize).min(6), Some(HEAD));
-    agent_badge_right(c, left - 4.0, 9.0, v.agents, true);
+    c.fill_rect(0.0, 0.0, 160.0, 18.0, Color::ACCENT);
+    // the title gives way to the sessions: «Claude» when the counts need the room
+    let left = session_marks(c, 154.0, 9.0, v.sessions, true);
+    let font = FontSpec::bold(11.0);
+    let title = ["Claude Code", "Claude"].into_iter().find(|t| 6.0 + Canvas::text_width(t, font) + 6.0 <= left).unwrap_or("");
+    c.text(r(6.0, 0.0, 110.0, 18.0), Align::LEFT, title, font, HEAD);
     ring(c, 40.0, 46.0, v.session.as_ref(), tr!("claudestats.five_hours"));
     ring(c, 120.0, 46.0, v.week.as_ref(), tr!("claudestats.week"));
     c.line(6.0, 108.0, 154.0, 108.0, 1.0, RULE);
-    c.text(r(6.0, 110.0, 60.0, 16.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), DIM);
+    let today = tr!("claudestats.today");
+    let lf = FontSpec::sans(9.0);
+    c.text(r(6.0, 110.0, 60.0, 16.0), Align::LEFT, today, lf, DIM);
+    agent_badge(c, 6.0 + Canvas::text_width(today, lf) + 5.0, 118.0, v.agents, false);
     c.text(r(50.0, 110.0, 104.0, 16.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(v.totals.all())), FontSpec::bold(11.0), Color::WHITE);
 }
 
@@ -628,7 +653,7 @@ fn big_pct(c: &mut Canvas, x: f32, y: f32, g: Option<&Gauge>, max_w: f32) -> f32
 /// «Крупно»: the session limit in big digits, the week below.
 fn draw_big(c: &mut Canvas, v: &View) {
     c.fill(BG);
-    let left = session_marks(c, 154.0, 9.0, v.sessions);
+    let left = session_marks(c, 154.0, 9.0, v.sessions, false);
     // the long label, or the short one when the sessions take the room
     let lf = FontSpec::sans(9.0);
     let label = [tr!("claudestats.five_hour_limit"), tr!("claudestats.five_hours")]
@@ -678,7 +703,12 @@ fn column(c: &mut Canvas, x: f32, top: f32, h: f32, w: f32, g: Option<&Gauge>, l
             c.fill_rect(x - 2.0, (top + h - h * p).round(), w + 4.0, 1.0, Color::WHITE);
         }
     }
-    c.text(r(x - 6.0, top + h + 2.0, w + 12.0, 12.0), Align::CENTER, &pct_text(g), FontSpec::bold(8.0), Color::WHITE);
+    // «100%» runs into the next column's label: three digits go without the sign
+    let mut p = pct_text(g);
+    if p.chars().count() > 3 {
+        p.pop();
+    }
+    c.text(r(x - 6.0, top + h + 2.0, w + 12.0, 12.0), Align::CENTER, &p, FontSpec::bold(8.0), Color::WHITE);
     let lw = crate::pixelfont::width(label, 0);
     c.pixel_text((x + w / 2.0) as i32 - lw / 2, (top + h + 13.0) as i32, label, DIM, 0, 1);
 }
@@ -722,26 +752,7 @@ fn led_bar(c: &mut Canvas, x: i32, y: i32, g: Option<&Gauge>) {
 fn draw_pixels(c: &mut Canvas, v: &View) {
     c.fill(Color::rgb(8, 8, 10));
     c.pixel_text(8, 3, "CLAUDE CODE", Color::ACCENT, 1, 1);
-    let mut x = 150;
-    for s in v.sessions.iter().take(8) {
-        c.fill_rect(x as f32, 5.0, 5.0, 5.0, state_color(s.state));
-        x -= 8;
-    }
-    // agents: the little glyph and the count, left of the squares
-    if v.agents > 0 {
-        let n = v.agents.to_string();
-        let right = x + 8 - 5;
-        let nx = right - crate::pixelfont::width(&n, 1);
-        c.pixel_text(nx, 3, &n, Color::ACCENT, 1, 1);
-        let gx = nx - GLYPH_W as i32 - 2;
-        for (ry, row) in AGENT_GLYPH.iter().enumerate() {
-            for (rx, ch) in row.chars().enumerate() {
-                if ch == '#' {
-                    c.set_pixel(gx + rx as i32, 5 + ry as i32, Color::ACCENT);
-                }
-            }
-        }
-    }
+    pixel_marks(c, 155, 3, v.sessions);
     let rows = [(tr!("claudestats.session_5h"), v.session.as_ref()), (tr!("claudestats.week"), v.week.as_ref())];
     for (i, (label, g)) in rows.into_iter().enumerate() {
         let y = 20 + i as i32 * 42;
@@ -757,6 +768,13 @@ fn draw_pixels(c: &mut Canvas, v: &View) {
     c.fill_rect(0.0, 112.0, 160.0, 1.0, Color::rgb(40, 38, 46));
     let today = format!("{} {}", tr!("claudestats.today"), tr!("claudestats.tokens_short", total = compact(v.totals.all())));
     c.pixel_text(8, 115, &today.to_uppercase(), Color::rgb(200, 195, 210), 1, 1);
+    // agents: the little glyph and the count at the right end of the bottom line
+    if v.agents > 0 {
+        let n = v.agents.to_string();
+        let nx = 152 - crate::pixelfont::width(&n, 1);
+        c.pixel_text(nx, 115, &n, Color::ACCENT, 1, 1);
+        crate::faces::draw_agent_glyph(c, nx - GLYPH_W as i32 - 2, 116, 1, Color::ACCENT);
+    }
 }
 
 /// «Классика»: sessions and today's tokens, no limits.
@@ -773,6 +791,8 @@ fn draw_classic(c: &mut Canvas, v: &View) {
     if sessions.is_empty() {
         c.text(r(8.0, y, 144.0, 18.0), Align::LEFT, tr!("claudestats.no_sessions"), FontSpec::sans(10.0), DIM);
     }
+    // with «и ещё N» below, the rows close up to leave it room above the line
+    let step = if sessions.len() > 3 { 18.0 } else { 20.0 };
     for s in sessions.iter().take(3) {
         let color = state_color(s.state);
         c.fill_circle(12.0, y + 9.0, 4.0, color);
@@ -782,10 +802,10 @@ fn draw_classic(c: &mut Canvas, v: &View) {
         c.text(r(22.0, y, 80.0, 18.0), Align::LEFT, &name, name_font, Color::WHITE);
         agent_badge(c, 22.0 + Canvas::text_width(&name, name_font) + 4.0, y + 9.0, s.agents.len(), false);
         c.text(r(96.0, y, 56.0, 18.0), Align::RIGHT, s.state.lower(), FontSpec::sans(10.0), color);
-        y += 20.0;
+        y += step;
     }
     if sessions.len() > 3 {
-        c.text(r(22.0, y - 4.0, 130.0, 10.0), Align::LEFT, &tr!("claudestats.more", count = sessions.len() - 3), FontSpec::sans(8.0), DIM);
+        c.text(r(22.0, y - 1.0, 130.0, 10.0), Align::LEFT, &tr!("claudestats.more", count = sessions.len() - 3), FontSpec::sans(8.0), DIM);
     }
 
     c.line(8.0, 90.0, 152.0, 90.0, 1.0, RULE);
