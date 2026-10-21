@@ -573,6 +573,7 @@ claudestats.today_at = сегодня {time}
 claudestats.tomorrow_at = завтра {time}
 claudestats.day_at = {day} {time}
 claudestats.today_replies = сегодня · {count} отв.
+claudestats.replies_short = {count} отв.
 claudestats.sessions[one] = {n} сессия
 claudestats.sessions[few] = {n} сессии
 claudestats.sessions[many] = {n} сессий

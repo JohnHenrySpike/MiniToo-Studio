@@ -573,6 +573,7 @@ claudestats.today_at = today {time}
 claudestats.tomorrow_at = tomorrow {time}
 claudestats.day_at = {day} {time}
 claudestats.today_replies = today · {count} replies
+claudestats.replies_short = {count} replies
 claudestats.sessions[one] = {n} session
 claudestats.sessions[other] = {n} sessions
 claudestats.agents[one] = {n} agent

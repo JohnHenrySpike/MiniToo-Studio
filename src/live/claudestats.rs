@@ -143,9 +143,12 @@ fn collect_jsonl(dir: &Path, out: &mut Vec<PathBuf>, depth: u32) {
     }
 }
 
-/// ≥1M → «12.3M» (two decimals below 10M), ≥1000 → «4.5K».
+/// ≥1B → «1.01B», ≥1M → «12.3M» (two decimals below 10 of a unit), ≥1000 → «4.5K».
 pub fn compact(n: i64) -> String {
-    if n >= 1_000_000 {
+    if n >= 1_000_000_000 {
+        let decimals = if n >= 10_000_000_000 { 1 } else { 2 };
+        format!("{:.*}B", decimals, n as f64 / 1e9)
+    } else if n >= 1_000_000 {
         let decimals = if n >= 10_000_000 { 1 } else { 2 };
         format!("{:.*}M", decimals, n as f64 / 1e6)
     } else if n >= 1000 {
@@ -466,6 +469,38 @@ fn session_dots(c: &mut Canvas, right_x: f32, cy: f32, sessions: &[Session], max
     x + 9.0 - 4.0
 }
 
+/// Sessions ending at `right`, the most urgent first: up to five dots, above that a dot and a
+/// count per state («● 1 ● 4 ● 10»), so the width stays put however many there are.
+/// Returns the left edge drawn.
+fn session_marks(c: &mut Canvas, right: f32, cy: f32, sessions: &[Session]) -> f32 {
+    const ORDER: [ClaudeState; 3] = [ClaudeState::Alerting, ClaudeState::Working, ClaudeState::Chilling];
+    let count = |st: ClaudeState| sessions.iter().filter(|s| s.state == st).count();
+    if sessions.len() <= 5 {
+        let mut x = right - 3.0;
+        for st in ORDER.iter().rev() {
+            for _ in 0..count(*st) {
+                c.fill_circle(x, cy, 3.0, state_color(*st));
+                x -= 9.0;
+            }
+        }
+        return x + 9.0 - 3.0;
+    }
+    let f = FontSpec::bold(9.0);
+    let mut x = right;
+    for st in ORDER.iter().rev() {
+        let n = count(*st);
+        if n == 0 {
+            continue;
+        }
+        let t = n.to_string();
+        let w = Canvas::text_width(&t, f);
+        c.text(r(x - w, cy - 7.0, w + 2.0, 14.0), Align::LEFT, &t, f, state_color(*st));
+        c.fill_circle(x - w - 5.0, cy, 3.0, state_color(*st));
+        x -= w + 15.0;
+    }
+    x + 7.0
+}
+
 /// Session rows: dot, project, optionally the state on the right.
 #[allow(clippy::too_many_arguments)]
 fn session_rows(c: &mut Canvas, x: f32, y0: f32, w: f32, row: f32, max: usize, sessions: &[Session], states: bool) {
@@ -522,8 +557,15 @@ fn draw_bars(c: &mut Canvas, v: &View) {
     }
     c.line(6.0, 108.0, 154.0, 108.0, 1.0, RULE);
     let t = v.totals;
-    c.text(r(6.0, 110.0, 80.0, 16.0), Align::LEFT, &tr!("claudestats.tokens_short", total = compact(t.all())), FontSpec::bold(10.0), Color::WHITE);
-    c.text(r(70.0, 110.0, 84.0, 16.0), Align::RIGHT, &tr!("claudestats.today_replies", count = t.replies), FontSpec::sans(8.0), DIM);
+    let (tokens, tf) = (tr!("claudestats.tokens_short", total = compact(t.all())), FontSpec::bold(10.0));
+    c.text(r(6.0, 110.0, 148.0, 16.0), Align::LEFT, &tokens, tf, Color::WHITE);
+    // the replies as far as they fit: «сегодня · N отв.», then «N отв.», then nothing
+    let room = 148.0 - Canvas::text_width(&tokens, tf) - 8.0;
+    let rf = FontSpec::sans(8.0);
+    let replies = [tr!("claudestats.today_replies", count = t.replies), tr!("claudestats.replies_short", count = t.replies)];
+    if let Some(s) = replies.iter().find(|s| Canvas::text_width(s, rf) <= room) {
+        c.text(r(6.0, 110.0, 148.0, 16.0), Align::RIGHT, s, rf, DIM);
+    }
 }
 
 fn ring(c: &mut Canvas, cx: f32, cy: f32, g: Option<&Gauge>, label: &str) {
@@ -559,33 +601,70 @@ fn draw_rings(c: &mut Canvas, v: &View) {
     c.text(r(50.0, 110.0, 104.0, 16.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(v.totals.all())), FontSpec::bold(11.0), Color::WHITE);
 }
 
+/// Big percent with a small raised «%», shrunk until it fits `max_w`. Returns the right edge.
+fn big_pct(c: &mut Canvas, x: f32, y: f32, g: Option<&Gauge>, max_w: f32) -> f32 {
+    let Some(g) = g else {
+        let f = FontSpec::bold(36.0);
+        c.text_tl(x, y, "—", f, DIM);
+        return x + Canvas::text_width("—", f);
+    };
+    let digits = (g.pct.round() as i64).to_string();
+    let mut size = 36.0;
+    let (dw, pw) = loop {
+        let (dw, pw) = (Canvas::text_width(&digits, FontSpec::bold(size)), Canvas::text_width("%", FontSpec::bold(size * 0.42)));
+        if dw + 1.0 + pw <= max_w || size <= 20.0 {
+            break (dw, pw);
+        }
+        size -= 2.0;
+    };
+    let (df, pf) = (FontSpec::bold(size), FontSpec::bold(size * 0.42));
+    let base = y + df.ascent();
+    c.text_at(x, base, &digits, df, severity(g));
+    // the «%» top roughly level with the digits
+    c.text_at(x + dw + 1.0, base - size * 0.72 + pf.ascent() * 0.75, "%", pf, severity(g));
+    x + dw + 1.0 + pw
+}
+
 /// «Крупно»: the session limit in big digits, the week below.
 fn draw_big(c: &mut Canvas, v: &View) {
     c.fill(BG);
-    c.text(r(6.0, 2.0, 100.0, 14.0), Align::LEFT, tr!("claudestats.five_hour_limit"), FontSpec::sans(9.0), DIM);
-    session_dots(c, 152.0, 9.0, v.sessions, 5, None);
+    let left = session_marks(c, 154.0, 9.0, v.sessions);
+    // the long label, or the short one when the sessions take the room
+    let lf = FontSpec::sans(9.0);
+    let label = [tr!("claudestats.five_hour_limit"), tr!("claudestats.five_hours")]
+        .into_iter()
+        .find(|l| Canvas::text_width(l, lf) <= left - 12.0)
+        .unwrap_or("");
+    c.text(r(6.0, 2.0, 100.0, 14.0), Align::LEFT, label, lf, DIM);
     let s = v.session.as_ref();
-    c.text(r(4.0, 14.0, 92.0, 40.0), Align::LEFT, &pct_text(s), FontSpec::bold(36.0), gauge_color(s));
-    if s.is_some_and(|g| !g.reset.is_empty()) {
-        c.text(r(92.0, 20.0, 62.0, 12.0), Align::RIGHT, tr!("claudestats.resets_in"), FontSpec::sans(8.0), DIM);
-        c.text(r(80.0, 32.0, 74.0, 16.0), Align::RIGHT, reset_text(s), FontSpec::bold(13.0), Color::WHITE);
+    let end = big_pct(c, 4.0, 13.0, s, 92.0);
+    if let Some(g) = s.filter(|g| !g.reset.is_empty()) {
+        let w = 154.0 - end;
+        c.text(r(end, 20.0, w, 12.0), Align::RIGHT, tr!("claudestats.resets_in"), FontSpec::sans(8.0), DIM);
+        let f = if Canvas::text_width(&g.reset, FontSpec::bold(13.0)) <= w - 6.0 { FontSpec::bold(13.0) } else { FontSpec::bold(11.0) };
+        c.text(r(end, 32.0, w, 16.0), Align::RIGHT, &g.reset, f, Color::WHITE);
     }
     pace_bar(c, 6.0, 57.0, 148.0, 8.0, s);
 
     let w = v.week.as_ref();
     let label = tr!("claudestats.week");
-    let lf = FontSpec::sans(9.0);
     c.text(r(6.0, 72.0, 60.0, 14.0), Align::LEFT, label, lf, DIM);
     c.text(r(10.0 + Canvas::text_width(label, lf), 72.0, 40.0, 14.0), Align::LEFT, &pct_text(w), FontSpec::bold(11.0), gauge_color(w));
     c.text(r(80.0, 72.0, 74.0, 14.0), Align::RIGHT, reset_text(w), lf, DIM);
     pace_bar(c, 6.0, 88.0, 148.0, 4.0, w);
 
+    // the agents badge (or «сегодня») and today's tokens
     c.fill_rect(0.0, 104.0, 160.0, 24.0, Color::rgb(30, 26, 36));
-    let who = trn!("claudestats.sessions", v.sessions.len());
-    let wf = FontSpec::sans(9.0);
-    c.text(r(6.0, 104.0, 70.0, 24.0), Align::LEFT, &who, wf, DIM);
-    agent_badge(c, 6.0 + Canvas::text_width(&who, wf) + 5.0, 116.0, v.agents, false);
-    c.text(r(60.0, 104.0, 94.0, 24.0), Align::RIGHT, &tr!("claudestats.tokens_short", total = compact(v.totals.all())), FontSpec::bold(11.0), Color::WHITE);
+    let left = if v.agents > 0 {
+        agent_badge(c, 6.0, 116.0, v.agents, false);
+        6.0 + badge_width(v.agents)
+    } else {
+        c.text(r(6.0, 104.0, 60.0, 24.0), Align::LEFT, tr!("claudestats.today"), FontSpec::sans(9.0), DIM);
+        6.0 + Canvas::text_width(tr!("claudestats.today"), FontSpec::sans(9.0))
+    };
+    let tokens = tr!("claudestats.tokens_short", total = compact(v.totals.all()));
+    let tf = if Canvas::text_width(&tokens, FontSpec::bold(11.0)) <= 148.0 - left { FontSpec::bold(11.0) } else { FontSpec::bold(9.0) };
+    c.text(r(6.0, 104.0, 148.0, 24.0), Align::RIGHT, &tokens, tf, Color::WHITE);
 }
 
 fn column(c: &mut Canvas, x: f32, top: f32, h: f32, w: f32, g: Option<&Gauge>, label: &str) {
@@ -934,6 +1013,8 @@ mod tests {
         assert_eq!(compact(4300), "4.3K");
         assert_eq!(compact(1_566_210), "1.57M");
         assert_eq!(compact(12_345_678), "12.3M");
+        assert_eq!(compact(1_008_400_000), "1.01B");
+        assert_eq!(compact(12_345_678_901), "12.3B");
         assert_eq!(compact(0), "0");
     }
 
@@ -1065,5 +1146,9 @@ mod tests {
         for s in 0..STYLES.len() as i64 {
             assert_ne!(frame(s, &View::new(&idle, &totals, &limits, now)), frame(s, &View::new(&busy, &totals, &limits, now)), "style {s}");
         }
+        // «Крупно» counts every session, past the five dots too
+        let many = |n| vec![session(vec![]); n];
+        let (six, seven) = (many(6), many(7));
+        assert_ne!(frame(2, &View::new(&six, &totals, &limits, now)), frame(2, &View::new(&seven, &totals, &limits, now)));
     }
 }
