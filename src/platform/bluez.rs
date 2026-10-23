@@ -38,6 +38,27 @@ pub async fn connect_audio(mac: String) -> Result<(), String> {
     }
 }
 
+/// The speaker's volume 0..15 as AVRCP absolute volume (0..127) on its A2DP transport, so
+/// the host side agrees with it. The SPP volume command alone changes the speaker until the
+/// next AVRCP sync, which sets it back to the transport's old value. `Ok(false)`: no audio
+/// transport, nothing to set.
+pub async fn set_volume(mac: String, volume: u8) -> Result<bool, String> {
+    #[cfg(target_os = "linux")]
+    {
+        linux::set_volume(&mac, avrcp_volume(volume)).await
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (mac, volume);
+        Ok(false)
+    }
+}
+
+/// 0..15 → 0..127, rounded up: the speaker maps back rounding down (60 → 7, 59 → 6).
+pub fn avrcp_volume(volume: u8) -> u16 {
+    (volume.min(15) as u16 * 127).div_ceil(15)
+}
+
 /// Classic discovery for `secs` seconds: `(name, MAC)`, devices with "Divoom" in the name first.
 pub async fn discover(secs: u64) -> Result<Vec<(String, String)>, String> {
     #[cfg(target_os = "linux")]
@@ -65,6 +86,16 @@ fn device_path<'a>(objects: &'a Objects, mac: &str) -> Option<&'a str> {
         let addr = str_prop(ifaces.get("org.bluez.Device1")?, "Address")?;
         addr.eq_ignore_ascii_case(mac.trim()).then_some(path.as_str())
     })
+}
+
+/// The `MediaTransport1` object under the device, if audio is connected.
+#[cfg(target_os = "linux")]
+fn transport_path<'a>(objects: &'a Objects, mac: &str) -> Option<&'a str> {
+    let prefix = format!("{}/", device_path(objects, mac)?);
+    objects
+        .iter()
+        .find(|(path, ifaces)| path.as_str().starts_with(&prefix) && ifaces.contains_key("org.bluez.MediaTransport1"))
+        .map(|(path, _)| path.as_str())
 }
 
 #[cfg(target_os = "linux")]
@@ -176,6 +207,14 @@ mod linux {
             .map_err(|e| tr!("bluez.connect_failed", error = e))
     }
 
+    pub async fn set_volume(mac: &str, volume: u16) -> Result<bool, String> {
+        let conn = system().await?;
+        let objects = managed_objects(&conn).await?;
+        let Some(path) = super::transport_path(&objects, mac) else { return Ok(false) };
+        let args = ("org.bluez.MediaTransport1", "Volume", Value::from(volume));
+        call(&conn, path, "org.freedesktop.DBus.Properties", "Set", &args, CALL_TIMEOUT).await.map(|_| true)
+    }
+
     fn adapter(objects: &Objects) -> Result<String, String> {
         let mut adapters: Vec<(&str, bool)> = objects
             .iter()
@@ -262,6 +301,22 @@ mod tests {
         assert!(!battery_from(&o, "B1:21:81:05:E2:65").audio_connected);
         obj(&mut o, &format!("{DEV}/player0"), "org.bluez.MediaControl1", vec![("Connected", v(true))]);
         assert!(battery_from(&o, "B1:21:81:05:E2:65").audio_connected);
+    }
+
+    #[test]
+    fn volume_scale() {
+        assert_eq!(avrcp_volume(0), 0);
+        assert_eq!(avrcp_volume(7), 60);
+        assert_eq!(avrcp_volume(15), 127);
+        assert_eq!(avrcp_volume(99), 127);
+        // the speaker maps back rounding down: every step survives the round trip
+        for v in 0..=15u8 {
+            assert_eq!(avrcp_volume(v) * 15 / 127, v as u16);
+        }
+        let mut o = base();
+        assert_eq!(transport_path(&o, "B1:21:81:05:E2:65"), None);
+        obj(&mut o, &format!("{DEV}/sep2/fd0"), "org.bluez.MediaTransport1", vec![("Volume", v(8u16))]);
+        assert_eq!(transport_path(&o, "b1:21:81:05:e2:65"), Some("/org/bluez/hci0/dev_B1_21_81_05_E2_65/sep2/fd0"));
     }
 
     #[test]

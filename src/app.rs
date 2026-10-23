@@ -1974,6 +1974,13 @@ impl Controller {
                 self.command_bytes(0x08, vec![v]);
                 self.command_bytes(0x09, vec![]);
                 self.set_info("volume", json!(v));
+                // and over AVRCP, or the next sync of the audio link sets the old volume back
+                let mac = self.mac.clone();
+                self.rt.spawn(async move {
+                    if let Err(e) = bluez::set_volume(mac, v).await {
+                        log::debug!("AVRCP volume: {e}");
+                    }
+                });
             }
             Command::PlayPause => {
                 let playing = self.device_info.get("playing").and_then(|v| v.as_bool()).unwrap_or(false);
