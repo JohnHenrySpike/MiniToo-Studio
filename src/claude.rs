@@ -11,6 +11,9 @@ pub const WORKING_TIMEOUT_SECS: i64 = 15 * 60;
 pub const SESSION_TIMEOUT_SECS: i64 = 3 * 60 * 60;
 /// A subagent with no event for this long is taken as finished (a missed `SubagentStop`).
 pub const AGENT_TIMEOUT_SECS: i64 = 15 * 60;
+/// The hooks are `async`, so their requests can overtake one another: a tool event this soon
+/// after `Stop` / `Notification` of the same session is a late one from before them.
+pub const STALE_TOOL_EVENT_MS: i64 = 500;
 pub const HOOK_EVENTS: [&str; 9] = [
     "SessionStart",
     "SessionEnd",
@@ -194,6 +197,14 @@ impl ClaudeMonitor {
         if event == "SubagentStop" {
             return !agent.is_empty() && self.sessions.get_mut(&id).is_some_and(|s| s.remove_agent(&agent));
         }
+        if matches!(event.as_str(), "PreToolUse" | "PostToolUse")
+            && self.sessions.get(&id).is_some_and(|s| {
+                matches!(s.last_event.as_str(), "Stop" | "Notification" | "PermissionRequest")
+                    && (now - s.updated).num_milliseconds() < STALE_TOOL_EVENT_MS
+            })
+        {
+            return false;
+        }
         let state = match event.as_str() {
             "SessionEnd" => return self.sessions.remove(&id).is_some(),
             "SessionStart" | "Stop" => ClaudeState::Chilling,
@@ -332,12 +343,26 @@ pub fn hook_command(port: u16) -> String {
     )
 }
 
+/// Our hook for `event`. `async`: Claude Code does not wait for the curl, it only notifies us.
+/// `SessionEnd` stays synchronous: it fires once, while Claude Code is exiting.
+fn hook_entry(event: &str, port: u16) -> Value {
+    let mut h = json!({ "type": "command", "command": hook_command(port) });
+    if event != "SessionEnd" {
+        h["async"] = json!(true);
+    }
+    h
+}
+
+fn is_own_entry(h: &Value, event: &str, port: u16) -> bool {
+    h.get("command").and_then(|c| c.as_str()).is_some_and(|c| is_own_command_port(c, port))
+        && h.get("async").and_then(|a| a.as_bool()).unwrap_or(false) == (event != "SessionEnd")
+}
+
 /// The snippet shown in the UI and copied by «Скопировать JSON».
 pub fn hooks_snippet(port: u16) -> String {
-    let group = json!([{ "hooks": [{ "type": "command", "command": hook_command(port) }] }]);
     let mut hooks = serde_json::Map::new();
     for e in HOOK_EVENTS {
-        hooks.insert(e.to_string(), group.clone());
+        hooks.insert(e.to_string(), json!([{ "hooks": [hook_entry(e, port)] }]));
     }
     serde_json::to_string_pretty(&json!({ "hooks": hooks })).unwrap_or_default()
 }
@@ -423,7 +448,7 @@ pub fn install_hooks_at(path: &Path, port: u16) -> Result<String, String> {
         groups
             .as_array_mut()
             .unwrap()
-            .push(json!({ "hooks": [{ "type": "command", "command": hook_command(port) }] }));
+            .push(json!({ "hooks": [hook_entry(e, port)] }));
     }
     write_settings(path, &root)?;
     let _ = b;
@@ -447,8 +472,8 @@ pub fn uninstall_hooks_at(path: &Path) -> Result<String, String> {
 pub enum HooksState {
     #[default]
     Missing,
-    /// some of ours, but not every event of [`HOOK_EVENTS`] with the current port (an older
-    /// version of the app, or another port): «Установить хуки» brings them up to date
+    /// some of ours, but not every event of [`HOOK_EVENTS`] with the current port and `async`
+    /// (an older version of the app, or another port): «Установить хуки» brings them up to date
     Outdated,
     Installed,
 }
@@ -456,25 +481,26 @@ pub enum HooksState {
 pub fn hooks_state_at(path: &Path, port: u16) -> HooksState {
     let Ok(root) = read_settings(path) else { return HooksState::Missing };
     let Some(hooks) = root.get("hooks").and_then(|h| h.as_object()) else { return HooksState::Missing };
-    let has = |e: &str, own: &dyn Fn(&str) -> bool| {
+    let has = |e: &str, own: &dyn Fn(&Value) -> bool| {
         hooks.get(e).and_then(|g| g.as_array()).is_some_and(|groups| {
-            groups.iter().any(|g| {
-                g.get("hooks")
-                    .and_then(|h| h.as_array())
-                    .is_some_and(|l| l.iter().any(|h| h.get("command").and_then(|c| c.as_str()).is_some_and(own)))
-            })
+            groups
+                .iter()
+                .any(|g| g.get("hooks").and_then(|h| h.as_array()).is_some_and(|l| l.iter().any(own)))
         })
     };
-    if HOOK_EVENTS.iter().all(|e| has(e, &|c| is_own_command_port(c, port))) {
+    if HOOK_EVENTS.iter().all(|e| has(e, &|h| is_own_entry(h, e, port))) {
         HooksState::Installed
-    } else if hooks.keys().any(|e| has(e, &is_own_command)) {
+    } else if hooks
+        .keys()
+        .any(|e| has(e, &|h| h.get("command").and_then(|c| c.as_str()).is_some_and(is_own_command)))
+    {
         HooksState::Outdated
     } else {
         HooksState::Missing
     }
 }
 
-/// «Установлены» = every event of [`HOOK_EVENTS`] has our entry with the current port.
+/// «Установлены» = every event of [`HOOK_EVENTS`] has our entry with the current port and `async`.
 pub fn hooks_installed_at(path: &Path, port: u16) -> bool {
     hooks_state_at(path, port) == HooksState::Installed
 }
@@ -566,6 +592,25 @@ mod tests {
     }
 
     #[test]
+    fn late_tool_events() {
+        let now = Local::now();
+        let ms = |n| now + chrono::Duration::milliseconds(n);
+        let mut m = ClaudeMonitor::new(false);
+        m.handle_hook(&hook("UserPromptSubmit", "s", json!({})), now);
+        // async hooks: the permission alert overtakes its own PreToolUse
+        m.handle_hook(&hook("Notification", "s", json!({"message": "Claude needs your permission to use Bash"})), ms(10));
+        assert!(!m.handle_hook(&hook("PreToolUse", "s", json!({})), ms(15)));
+        assert_eq!(m.state(), ClaudeState::Alerting);
+        // after the answer the tool events count again
+        m.handle_hook(&hook("PostToolUse", "s", json!({})), ms(3000));
+        assert_eq!(m.state(), ClaudeState::Working);
+        // `Stop` overtakes the last PostToolUse
+        m.handle_hook(&hook("Stop", "s", json!({})), ms(3100));
+        assert!(!m.handle_hook(&hook("PostToolUse", "s", json!({})), ms(3105)));
+        assert_eq!(m.state(), ClaudeState::Chilling);
+    }
+
+    #[test]
     fn timeouts() {
         let now = Local::now();
         let mut m = ClaudeMonitor::new(false);
@@ -609,6 +654,15 @@ mod tests {
         assert_eq!(v["model"], "opus");
         let stop = v["hooks"]["Stop"].as_array().unwrap();
         assert_eq!(stop.len(), 2, "foreign hook kept, old own one replaced");
+        assert_eq!(stop[1]["hooks"][0]["async"], true);
+        assert!(v["hooks"]["SessionEnd"][0]["hooks"][0].get("async").is_none());
+        // the same hooks without `async` (the previous version): not up to date
+        let mut sync = v.clone();
+        sync["hooks"]["Stop"][1]["hooks"][0].as_object_mut().unwrap().remove("async");
+        std::fs::write(&path, sync.to_string()).unwrap();
+        assert_eq!(hooks_state_at(&path, 47800), HooksState::Outdated);
+        install_hooks_at(&path, 47800).unwrap();
+        assert_eq!(hooks_state_at(&path, 47800), HooksState::Installed);
         uninstall_hooks_at(&path).unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(v["hooks"]["Stop"].as_array().unwrap().len(), 1);
