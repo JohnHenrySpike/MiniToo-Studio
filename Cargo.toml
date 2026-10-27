@@ -1,6 +1,6 @@
 [package]
 name = "minitoo-studio"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 description = "MiniToo Studio: everything on the screen of a Divoom MiniToo speaker"
 authors = ["John Henry Spike <johnhenryspike@gmail.com>"]
