@@ -92,7 +92,7 @@ RFCOMM — no phone and no Divoom app — and turns that little screen into a de
 
 ### Download
 
-Download `minitoo-studio-vX.Y.Z-linux-x86_64.tar.gz` from the
+Download `minitoo-studio-X.Y.Z-linux-x86_64.tar.gz` from the
 [Releases](https://github.com/JohnHenrySpike/MiniToo-Studio/releases) page, then:
 
 ```bash
