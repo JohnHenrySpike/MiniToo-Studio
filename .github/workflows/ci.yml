@@ -42,7 +42,7 @@ jobs:
       - name: Create or update the draft release
         run: |
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
-          tag="v$version"
+          tag="$version"
 
           if gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null | grep -qx false; then
             echo "::warning::$tag is already released; bump the version in Cargo.toml for the next draft"
